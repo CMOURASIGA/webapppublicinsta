@@ -186,7 +186,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
             Revise as legendas sugeridas por usuários, faça uploads finais de mídias, agende datas no fuso horário local ou publique instantaneamente via Instagram Container API.
           </p>
         </div>
-        <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+        <ClipboardCheck className="w-5 h-5 text-brand-secondary" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -211,12 +211,12 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                   onClick={() => handlePostSelection(post)}
                   className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 ${
                     selectedPost?.id === post.id
-                      ? 'border-indigo-600 bg-indigo-50/50 shadow-sm ring-2 ring-indigo-600/10'
+                      ? 'border-brand-secondary bg-brand-light shadow-sm ring-2 ring-brand-primary/10'
                       : 'border-slate-250 bg-white hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 w-full">
-                    <span className="text-[10px] font-semibold text-indigo-600 uppercase bg-indigo-50 border border-indigo-200/55 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-bold text-brand-secondary uppercase bg-brand-light border border-brand-primary/20 px-2 py-0.5 rounded">
                       {post.tipo === 'VIDEO' ? '🎥 Vídeo' : '🖼️ Imagem'}
                     </span>
                     <span className="text-[10px] text-slate-400">
@@ -270,7 +270,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsEditing(!isEditing)}
-                    className="p-2 sm:px-3 text-xs font-semibold text-slate-700 hover:text-indigo-650 bg-slate-50 border border-slate-200 hover:border-indigo-300 rounded-lg flex items-center gap-1.5 transition-colors shrink-0"
+                    className="p-2 sm:px-3 text-xs font-semibold text-slate-700 hover:text-brand-secondary bg-slate-55 border border-slate-200 hover:border-brand-secondary rounded-lg flex items-center gap-1.5 transition-colors shrink-0"
                   >
                     <Edit3 className="w-4 h-4" />
                     <span className="hidden sm:inline">{isEditing ? 'Cancelar Edição' : 'Editar Legenda'}</span>
@@ -348,7 +348,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                         <span className="font-bold mr-1">suamarca_oficial</span>
                         <span className="text-slate-600 truncate">{isEditing ? editedLegenda : (selectedPost.legenda || 'Preenchimento em aprovação...')}</span>
                       </p>
-                      <span className="text-indigo-600 block font-semibold mt-1 truncate">
+                      <span className="text-brand-secondary block font-bold mt-1 truncate">
                         {isEditing ? editedHashtags : selectedPost.hashtags}
                       </span>
                     </div>
@@ -364,14 +364,14 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                 <div className="md:col-span-7 space-y-4">
                   {isEditing ? (
                     <div className="space-y-3 bg-slate-50 p-4 border border-slate-150 rounded-xl">
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase block tracking-wider">Editor Legenda / Hashtags</span>
+                      <span className="text-[10px] font-bold text-brand-secondary uppercase block tracking-wider">Editor Legenda / Hashtags</span>
                       <div>
                         <label className="block text-[10px] font-semibold text-slate-600 mb-1">Legenda Principal</label>
                         <textarea
                           rows={4}
                           value={editedLegenda}
                           onChange={(e) => setEditedLegenda(e.target.value)}
-                          className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-indigo-500 rounded-lg bg-white leading-normal"
+                          className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-brand-primary rounded-lg bg-white leading-normal"
                         />
                       </div>
                       <div>
@@ -380,13 +380,13 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                           type="text"
                           value={editedHashtags}
                           onChange={(e) => setEditedHashtags(e.target.value)}
-                          className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-indigo-500 rounded-lg bg-white"
+                          className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-brand-primary rounded-lg bg-white"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={handleUpdateCaption}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-all"
+                        className="px-3 py-1.5 bg-brand-secondary hover:bg-brand-primary text-brand-darker rounded text-xs font-bold flex items-center gap-1 shadow-sm transition-all border border-brand-primary/10"
                       >
                         Salvar Alterações
                       </button>
@@ -444,7 +444,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                   <button
                     onClick={handlePublishNow}
                     disabled={loading}
-                    className="flex-1 min-w-[150px] py-2.5 bg-indigo-650 hover:bg-indigo-755 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 shadow transition-all hover:shadow-indigo-600/10"
+                    className="flex-1 min-w-[150px] py-2.5 bg-brand-secondary hover:bg-brand-primary text-brand-darker text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-md transition-all hover:shadow-brand-secondary/20 border border-brand-primary/15"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -495,10 +495,10 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
 
               {/* Schedule time configuration screen */}
               {showScheduleForm && (
-                <form onSubmit={handleSchedulePost} className="border-t-2 border-indigo-100 bg-indigo-50/20 p-4 sm:p-5 rounded-xl space-y-4">
+                <form onSubmit={handleSchedulePost} className="border-t-2 border-brand-primary/30 bg-brand-light/30 p-4 sm:p-5 rounded-xl space-y-4">
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-5 h-5 text-indigo-600" />
-                    <span className="text-xs font-semibold text-indigo-900">Agendar Data e Hora de Disparo</span>
+                    <Clock className="w-5 h-5 text-brand-secondary" />
+                    <span className="text-xs font-bold text-brand-darker">Agendar Data e Hora de Disparo</span>
                   </div>
                   <p className="text-[11px] text-slate-500">
                     Insira o dia e horário que a automação executará a publicação no feed do Instagram. O scheduler consultará essa meta e publicará no momento configurado.
@@ -512,11 +512,11 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                         required
                         value={scheduleDateTime}
                         onChange={(e) => setScheduleDateTime(e.target.value)}
-                        className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-indigo-500 rounded-lg bg-white"
+                        className="w-full text-xs p-2.5 border border-slate-200 outline-none focus:border-brand-primary rounded-lg bg-white"
                       />
                     </div>
                     <div className="flex gap-2">
-                      <button
+                       <button
                         type="button"
                         onClick={() => setShowScheduleForm(false)}
                         className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
@@ -525,7 +525,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 shadow"
+                        className="flex-1 py-2.5 bg-brand-secondary hover:bg-brand-primary text-brand-darker rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-md border border-brand-primary/10"
                       >
                         Confirmar Agenda
                       </button>

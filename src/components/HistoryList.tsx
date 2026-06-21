@@ -87,7 +87,7 @@ export default function HistoryList() {
             Veja a linha do tempo de aprovações, edições, reversões e publicações automáticas executadas no sistema.
           </p>
         </div>
-        <History className="w-5 h-5 text-indigo-600" />
+        <History className="w-5 h-5 text-brand-secondary" />
       </div>
 
       {/* Filter panel */}
@@ -101,7 +101,7 @@ export default function HistoryList() {
             placeholder="Filtrar por nome..."
             value={filterUser}
             onChange={(e) => setFilterUser(e.target.value)}
-            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
           />
         </div>
 
@@ -114,7 +114,7 @@ export default function HistoryList() {
             placeholder="Ex: Rejeitado, Criado, Publicado"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
           />
         </div>
 
@@ -125,7 +125,7 @@ export default function HistoryList() {
           <select
             value={filterPeriod}
             onChange={(e) => setFilterPeriod(e.target.value)}
-            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 bg-white"
+            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary bg-white"
           >
             <option value="all">Sempre (Histórico Completo)</option>
             <option value="today">Apenas Hoje</option>
@@ -142,7 +142,7 @@ export default function HistoryList() {
               setFilterStatus('');
               setFilterPeriod('all');
             }}
-            className="w-full text-xs text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg py-2.5 font-medium transition-colors"
+            className="w-full text-xs text-brand-secondary hover:text-brand-primary bg-brand-light hover:bg-brand-primary/15 rounded-lg py-2.5 font-bold transition-colors"
           >
             Limpar Filtros
           </button>

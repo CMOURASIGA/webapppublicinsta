@@ -84,10 +84,10 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
 
   // Chart data preparing
   const chartData = [
-    { name: 'Rascunho', valor: posts.filter(p => p.status === 'RASCUNHO').length, fill: '#64748b' },
+    { name: 'Rascunho', valor: posts.filter(p => p.status === 'RASCUNHO').length, fill: '#94a3b8' },
     { name: 'Pendentes', valor: stats.pending, fill: '#f59e0b' },
-    { name: 'Agendadas', valor: stats.scheduled, fill: '#06b6d4' },
-    { name: 'Publicadas', valor: stats.published, fill: '#6366f1' },
+    { name: 'Agendadas', valor: stats.scheduled, fill: '#0096DB' },
+    { name: 'Publicadas', valor: stats.published, fill: '#00A1E0' },
     { name: 'Rejeitadas', valor: stats.rejected, fill: '#f43f5e' },
   ];
 
@@ -109,7 +109,7 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
             <button
               onClick={triggerTick}
               disabled={tickProcessing}
-              className="py-2 px-3 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg border border-indigo-200/60 flex items-center gap-1.5 transition-all shadow-sm shrink-0"
+              className="py-2 px-3 text-xs font-semibold bg-brand-light text-brand-secondary hover:bg-brand-primary/15 rounded-lg border border-brand-primary/20 flex items-center gap-1.5 transition-all shadow-sm shrink-0"
               title="Varre postagens agendadas de forma síncrona"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${tickProcessing ? 'animate-spin' : ''}`} />
@@ -120,9 +120,9 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
       </div>
 
       {tickResult && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs py-2.5 px-4 rounded-lg flex items-center gap-2 animate-pulse">
-          <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
-          <span className="font-medium">{tickResult}</span>
+        <div className="bg-brand-light border border-brand-primary/20 text-brand-secondary text-xs py-2.5 px-4 rounded-lg flex items-center gap-2 animate-pulse">
+          <Clock className="w-4 h-4 text-brand-secondary shrink-0" />
+          <span className="font-semibold">{tickResult}</span>
         </div>
       )}
 
@@ -166,17 +166,17 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
         {/* Published */}
         <div 
           onClick={() => onNavigate?.('historico')} 
-          className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-400 transition-all cursor-pointer"
+          className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Postadas Feed</span>
-            <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+            <div className="p-1.5 bg-brand-light text-brand-secondary rounded-lg">
               <Send className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5 flex items-baseline gap-1.5">
             <span className="text-2xl font-bold text-slate-850 font-sans">{stats.published}</span>
-            <span className="text-[10px] text-indigo-600 font-semibold">No Instagram</span>
+            <span className="text-[10px] text-brand-secondary font-bold">No Instagram</span>
           </div>
         </div>
 
@@ -206,7 +206,7 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
         <div className="lg:col-span-4 bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-indigo-600" /> Distribuição de Conteúdo
+              <Layers className="w-4 h-4 text-brand-secondary" /> Distribuição de Conteúdo
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Indicador acumulado por estado dos posts.</p>
           </div>
@@ -234,11 +234,11 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
               <strong className="text-slate-700">{stats.pending}</strong>
             </div>
             <div className="flex justify-between py-1.5">
-              <span className="text-slate-500 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#06b6d4]"></span> Agendadas</span>
+              <span className="text-slate-500 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#0096DB]"></span> Agendadas</span>
               <strong className="text-slate-700">{stats.scheduled}</strong>
             </div>
             <div className="flex justify-between py-1.5">
-              <span className="text-slate-500 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#6366f1]"></span> Publicadas</span>
+              <span className="text-slate-500 flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#00A1E0]"></span> Publicadas</span>
               <strong className="text-slate-700">{stats.published}</strong>
             </div>
           </div>
@@ -285,7 +285,7 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
                     {/* Hover detail info */}
                     <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
                       <div className="flex items-center justify-between text-[10px] font-bold">
-                        <span className="text-indigo-400 uppercase text-[9px]">{post.tipo}</span>
+                        <span className="text-brand-primary uppercase text-[9px]">{post.tipo}</span>
                         <span className="text-slate-400">{new Date(post.data_publicacao || post.criado_em).toLocaleDateString()}</span>
                       </div>
                       <p className="text-[9.5px] leading-relaxed text-slate-200 line-clamp-4 font-sans italic my-2">
@@ -300,7 +300,7 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
 
                   <div className="p-2 text-[10px] text-slate-400 bg-slate-950/90 truncate border-t border-slate-900">
                     <span className="font-semibold text-slate-300 block truncate">{post.titulo}</span>
-                    <span className="text-[9px] text-indigo-400 mt-0.5 block truncate">{post.hashtags}</span>
+                    <span className="text-[9px] text-brand-primary mt-0.5 block truncate">{post.hashtags}</span>
                   </div>
                 </div>
               ))}
@@ -321,12 +321,12 @@ export default function Dashboard({ onNavigate, onSimulateTick }: DashboardProps
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <h3 className="font-bold text-xs text-slate-600 uppercase tracking-wide flex items-center gap-2">
-            <Activity className="w-4 h-4 text-indigo-600" /> Atividades Recentes de Auditoria (Últimas 5)
+            <Activity className="w-4 h-4 text-brand-secondary" /> Atividades Recentes de Auditoria (Últimas 5)
           </h3>
           <button 
             type="button" 
             onClick={() => onNavigate?.('historico')} 
-            className="text-xs text-indigo-650 hover:text-indigo-700 font-medium"
+            className="text-xs text-brand-secondary hover:text-brand-primary font-bold"
           >
             Ver Histórico Completo
           </button>

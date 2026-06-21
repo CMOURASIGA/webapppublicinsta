@@ -60,23 +60,23 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
             Alterne entre o Simulador Sandbox de Produção e conexões reais do Google Drive e Instagram Graph API.
           </p>
         </div>
-        <Settings className="w-5 h-5 text-indigo-600" />
+        <Settings className="w-5 h-5 text-brand-secondary" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Settings Info Block */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-gradient-to-br from-indigo-550 to-indigo-700 text-white rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="font-semibold text-sm tracking-tight flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-300" /> Modo Simulator Sandbox Ativo
+          <div className="bg-gradient-to-br from-brand-secondary to-brand-primary text-brand-darker rounded-xl p-5 shadow-md space-y-4 font-semibold">
+            <h3 className="font-bold text-sm tracking-tight flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-brand-darker" /> Modo Simulator Sandbox Ativo
             </h3>
-            <p className="text-xs leading-relaxed text-indigo-100">
+            <p className="text-xs leading-relaxed text-brand-darker/90">
               Por padrão, o WebApp é carregado em modo <strong>Simulado (Sandbox)</strong>. Isso permite que você teste o fluxo inteiro (Criação, Aprovação, agendamentos automáticos e postagens imediatas) sem custos ou chave-físicas reais.
             </p>
-            <div className="border-t border-indigo-500/40 pt-3 text-xs text-indigo-100 space-y-2">
-              <p className="font-medium">• Estruturas salvam localmente</p>
-              <p className="font-medium">• Uploads ao Drive geram IDs simulados</p>
-              <p className="font-medium">• Geração de legenda real via Gemini!</p>
+            <div className="border-t border-brand-primary/20 pt-3 text-xs text-brand-darker/90 space-y-2">
+              <p className="font-bold">• Estruturas salvam localmente</p>
+              <p className="font-bold">• Uploads ao Drive geram IDs simulados</p>
+              <p className="font-bold">• Geração de legenda real via Gemini!</p>
             </div>
           </div>
 
@@ -103,9 +103,9 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, mode: 'SIMULATOR' })}
-                className={`py-3 px-4 rounded-lg font-medium text-xs border text-center transition-all ${
+                className={`py-3 px-4 rounded-lg font-bold text-xs border text-center transition-all ${
                   settings.mode === 'SIMULATOR'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-600/10'
+                    ? 'border-brand-secondary bg-brand-light text-brand-secondary ring-2 ring-brand-secondary/10'
                     : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
@@ -142,19 +142,19 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
                   placeholder="e.g. 1a2b3c4d5e6f7g..."
                   value={settings.googleDriveFolderId}
                   onChange={(e) => setSettings({ ...settings, googleDriveFolderId: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                  className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">A estrutura criará as subpastas /Imagens e /Videos</span>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Modelo do Gemini AI
+                  <Sparkles className="w-3.5 h-3.5 text-brand-secondary" /> Modelo do Gemini AI
                 </label>
                 <select
                   value={settings.geminiModel}
                   onChange={(e) => setSettings({ ...settings, geminiModel: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 bg-white"
+                  className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary bg-white"
                 >
                   <option value="gemini-3.5-flash">gemini-3.5-flash (Ideal para Textos)</option>
                   <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (Altíssima Qualidade)</option>
@@ -176,7 +176,7 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
                     placeholder="e.g. 17841405342901324"
                     value={settings.instagramBusinessId}
                     onChange={(e) => setSettings({ ...settings, instagramBusinessId: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
                   />
                 </div>
 
@@ -190,7 +190,7 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
                     placeholder="EAAM77vT7..."
                     value={settings.instagramAccessToken}
                     onChange={(e) => setSettings({ ...settings, instagramAccessToken: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
                   />
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
                     placeholder="https://yourproject.supabase.co"
                     value={settings.supabaseUrl}
                     onChange={(e) => setSettings({ ...settings, supabaseUrl: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
                   />
                 </div>
 
@@ -222,7 +222,7 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
                     placeholder="eyJhbGciOi..."
                     value={settings.supabaseKey}
                     onChange={(e) => setSettings({ ...settings, supabaseKey: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+                    className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
                   />
                 </div>
               </div>
@@ -249,7 +249,7 @@ export default function SettingsSync({ onSettingsSaved }: SettingsSyncProps) {
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow transition-all duration-150 shrink-0"
+              className="px-4 py-2 bg-brand-secondary hover:bg-brand-primary text-brand-darker rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all duration-150 shrink-0 border border-brand-primary/10"
             >
               <Save className="w-4 h-4" />
               {loading ? 'Sincronizando...' : 'Salvar Alterações'}

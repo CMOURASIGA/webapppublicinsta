@@ -206,7 +206,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
             Preencha os dados abaixo do post, anexe os arquivos ao repositório Drive e conte com auxílio do Gemini AI para suas legendas.
           </p>
         </div>
-        <PlusCircle className="w-5 h-5 text-indigo-600" />
+        <PlusCircle className="w-5 h-5 text-brand-secondary" />
       </div>
 
       {successMsg && (
@@ -230,7 +230,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               placeholder="e.g. Infográfico Tendências UI/UX 2027"
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
             />
           </div>
 
@@ -243,9 +243,9 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                 <button
                   type="button"
                   onClick={() => setTipo('IMAGEM')}
-                  className={`w-full py-2 border rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`w-full py-2 border rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                     tipo === 'IMAGEM'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                      ? 'border-brand-secondary bg-brand-light text-brand-secondary'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
                 >
@@ -255,9 +255,9 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                 <button
                   type="button"
                   onClick={() => setTipo('VIDEO')}
-                  className={`w-full py-2 border rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`w-full py-2 border rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                     tipo === 'VIDEO'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                      ? 'border-brand-secondary bg-brand-light text-brand-secondary'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
                 >
@@ -289,7 +289,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               onDragLeave={handleDrag}
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center transition-all ${
-                dragActive ? 'border-indigo-500 bg-indigo-50/40' : 'border-slate-300 bg-slate-50/50'
+                dragActive ? 'border-brand-secondary bg-brand-light' : 'border-slate-300 bg-slate-50/50'
               }`}
             >
               <input
@@ -302,7 +302,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
 
               {uploading ? (
                 <div className="space-y-2 text-slate-500 py-3">
-                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
+                   <Loader2 className="w-8 h-8 text-brand-secondary animate-spin mx-auto" />
                   <p className="text-xs font-medium">Carregando mídias para o Google Drive...</p>
                   <p className="text-[10px] text-slate-400">Sincronizando metadados de mídia...</p>
                 </div>
@@ -330,9 +330,9 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                 </div>
               ) : (
                 <label htmlFor="file-upload-input" className="cursor-pointer space-y-2 py-3">
-                  <UploadCloud className="w-10 h-10 text-indigo-500 mx-auto" />
+                  <UploadCloud className="w-10 h-10 text-brand-secondary mx-auto" />
                   <div>
-                    <span className="text-xs font-semibold text-indigo-600 hover:underline">Arraste mídia ou procure arquivos</span>
+                    <span className="text-xs font-bold text-brand-secondary hover:underline">Arraste mídia ou procure arquivos</span>
                     <p className="text-[10px] text-slate-400 mt-1">PNG, JPG ou MP4 (Sincronização no Drive automático)</p>
                   </div>
                 </label>
@@ -349,7 +349,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               placeholder="Digite a legenda da publicação..."
               value={legenda}
               onChange={(e) => setLegenda(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
             />
           </div>
 
@@ -362,7 +362,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               placeholder="#hashtag1 #hashtag2 #hashtag3..."
               value={hashtags}
               onChange={(e) => setHashtags(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-500"
+              className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:border-brand-primary"
             />
           </div>
 
@@ -379,7 +379,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               type="button"
               disabled={saving}
               onClick={() => savePost('PENDENTE')}
-              className="w-1/2 py-2.5 bg-indigo-650 hover:bg-indigo-750 text-white rounded-lg text-xs font-semibold shadow hover:shadow-indigo-650/10 transition-all flex items-center justify-center gap-2"
+              className="w-1/2 py-2.5 bg-brand-secondary hover:bg-brand-primary text-brand-darker rounded-lg text-xs font-bold shadow hover:shadow-brand-secondary/20 transition-all flex items-center justify-center gap-2 border border-brand-primary/10"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar para Aprovação'}
             </button>
@@ -387,9 +387,9 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
         </div>
 
         {/* AI Caption Assistant Pane */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200 p-6 rounded-xl shadow-sm self-start space-y-4">
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-50 to-brand-light/30 border border-slate-200 p-6 rounded-xl shadow-sm self-start space-y-4">
           <div className="flex items-center gap-1.5">
-            <div className="p-1 px-1.5 bg-indigo-600 text-white rounded-lg">
+            <div className="p-1 px-1.5 bg-brand-secondary text-brand-darker rounded-lg font-bold">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
@@ -398,7 +398,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
             </div>
           </div>
 
-          <div className="bg-white p-4 border border-indigo-100/60 rounded-xl space-y-3.5 shadow-sm">
+          <div className="bg-white p-4 border border-brand-primary/20 rounded-xl space-y-3.5 shadow-sm">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1 uppercase tracking-wide">
                 Diretrizes de Tom da Marca e Instruções
@@ -408,7 +408,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                 placeholder="Ex de tom: Despojado, focado em vendas, inovador, persuasivo contendo piadas leves."
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg p-2 outline-none focus:border-indigo-500 bg-slate-50/50"
+                className="w-full text-xs border border-slate-200 rounded-lg p-2 outline-none focus:border-brand-primary bg-slate-50/50"
               />
             </div>
 
@@ -419,7 +419,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               <select
                 value={aiTagsCount}
                 onChange={(e) => setAiTagsCount(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-lg p-2 outline-none focus:border-indigo-500 bg-white"
+                className="w-full text-xs border border-slate-200 rounded-lg p-2 outline-none focus:border-brand-primary bg-white"
               >
                 <option value={3}>3 Hashtags Selecionadas</option>
                 <option value={5}>5 Hashtags Direcionadas (Normal)</option>
@@ -461,7 +461,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               <span className="text-[10px] font-bold text-slate-400 px-4 uppercase block tracking-wider">Preview Instantâneo do Post</span>
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-indigo-150 flex items-center justify-center text-xs font-bold text-indigo-700">
+                  <div className="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center text-xs font-bold text-brand-secondary border border-brand-primary/10">
                     IG
                   </div>
                   <div>
@@ -475,7 +475,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                   tipo === 'VIDEO' ? (
                     <video src={fileUrl} className="w-full aspect-video rounded-lg object-cover bg-slate-900 border border-slate-100" muted loops controls />
                   ) : (
-                    <img src={fileUrl} alt="post preview" className="w-full aspect-video rounded-lg object-cover bg-slate-50 border border-slate-100" />
+                    <img src={fileUrl} alt="post preview" className="w-full aspect-video rounded-lg object-cover bg-slate-50 border border-slate-100" referrerPolicy="no-referrer" />
                   )
                 ) : (
                   <div className="w-full aspect-video bg-slate-50 border border-slate-150 rounded-lg flex flex-col items-center justify-center text-slate-400 gap-1.5">
@@ -487,7 +487,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                 <div className="space-y-1">
                   <p className="text-xs text-slate-800 font-semibold line-clamp-1">{titulo}</p>
                   <p className="text-[11px] text-slate-600 leading-normal line-clamp-3 white-space-pre-wrap">{legenda || 'Preencha a legenda para as visualizações de feed...'}</p>
-                  <p className="text-[11px] text-indigo-600 font-semibold">{hashtags}</p>
+                  <p className="text-[11px] text-brand-secondary font-semibold">{hashtags}</p>
                 </div>
               </div>
             </div>

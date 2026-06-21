@@ -138,15 +138,15 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       
       {/* LEFT SIDEBAR - Desktop view */}
-      <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col shrink-0 border-r border-slate-800 h-screen sticky top-0 z-30">
+      <aside className="hidden md:flex w-64 bg-brand-dark text-slate-300 flex-col shrink-0 border-r border-brand-darker/60 h-screen sticky top-0 z-30">
         {/* Branding */}
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800 shrink-0">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-sm font-bold shrink-0">
-            <Instagram className="w-4 h-4 text-white" />
+        <div className="p-6 flex items-center gap-3 border-b border-brand-darker/40 shrink-0">
+          <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-brand-primary shadow-md shrink-0 border border-brand-primary/30">
+            <img src="https://i.imgur.com/c5XQ7TW.jpeg" className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" />
           </div>
           <div className="overflow-hidden">
             <span className="text-white font-bold text-base tracking-tight block">InstaFlow</span>
-            <span className="text-[10px] text-slate-500 block truncate">Instagram Control Center</span>
+            <span className="text-[10px] text-brand-primary font-medium block truncate">Instagram Control Center</span>
           </div>
         </div>
 
@@ -156,8 +156,8 @@ export default function App() {
             onClick={() => setCurrentScreen('dashboard')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all ${
               currentScreen === 'dashboard'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" />
@@ -168,8 +168,8 @@ export default function App() {
             onClick={() => setCurrentScreen('criar')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all ${
               currentScreen === 'criar'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <PlusCircle className="w-4 h-4 shrink-0" />
@@ -180,8 +180,8 @@ export default function App() {
             onClick={() => setCurrentScreen('aprovacao')}
             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
               currentScreen === 'aprovacao'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <span className="flex items-center gap-3 min-w-0">
@@ -190,7 +190,7 @@ export default function App() {
             </span>
             {pendingBadge > 0 && (
               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
-                currentScreen === 'aprovacao' ? 'bg-white text-indigo-700' : 'bg-amber-500 text-white'
+                currentScreen === 'aprovacao' ? 'bg-brand-darker text-brand-primary' : 'bg-amber-500 text-white'
               }`}>
                 {pendingBadge}
               </span>
@@ -201,8 +201,8 @@ export default function App() {
             onClick={() => setCurrentScreen('historico')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all ${
               currentScreen === 'historico'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <History className="w-4 h-4 shrink-0" />
@@ -213,8 +213,8 @@ export default function App() {
             onClick={() => setCurrentScreen('config')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all ${
               currentScreen === 'config'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Settings className="w-4 h-4 shrink-0" />
@@ -225,8 +225,8 @@ export default function App() {
             onClick={() => setCurrentScreen('logs')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide text-left transition-all ${
               currentScreen === 'logs'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-brand-secondary text-brand-darker shadow-md shadow-brand-secondary/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Terminal className="w-4 h-4 shrink-0" />
@@ -235,13 +235,13 @@ export default function App() {
         </nav>
 
         {/* User Card at the Bottom of Sidebar */}
-        <div className="p-4 border-t border-slate-800 relative bg-slate-950 shrink-0">
+        <div className="p-4 border-t border-brand-darker/40 relative bg-brand-darker/60 shrink-0">
           <button
             onClick={() => setProfileDropdown(!profileDropdown)}
-            className="w-full flex items-center gap-3 p-2 hover:bg-slate-800/80 rounded-lg text-left transition-colors outline-none cursor-pointer"
+            className="w-full flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg text-left transition-colors outline-none cursor-pointer"
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white uppercase shrink-0 ${
-              currentProfile === 'ADMINISTRADOR' ? 'bg-indigo-600' : 'bg-amber-600'
+              currentProfile === 'ADMINISTRADOR' ? 'bg-brand-secondary' : 'bg-amber-600'
             }`}>
               {currentProfile[0]}
             </div>
@@ -298,8 +298,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             {/* Logo display on mobile */}
             <div className="flex md:hidden items-center gap-2.5 cursor-pointer" onClick={() => setCurrentScreen('dashboard')}>
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shrink-0">
-                <Instagram className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg overflow-hidden bg-brand-primary flex items-center justify-center shadow-sm shrink-0">
+                <img src="https://i.imgur.com/c5XQ7TW.jpeg" className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" />
               </div>
               <span className="font-bold text-sm text-slate-850 tracking-tight">InstaFlow</span>
             </div>
@@ -316,8 +316,8 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             {/* Instagram status badge */}
-            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold border border-emerald-100 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <div className="flex items-center gap-2 bg-brand-light text-brand-secondary px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold border border-brand-primary/20 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-brand-secondary animate-pulse"></span>
               <span>Instagram API: Conectado</span>
             </div>
 
@@ -357,11 +357,11 @@ export default function App() {
         </header>
 
         {/* MOBILE NAVIGATION */}
-        <div className="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-around gap-1 overflow-x-auto text-[10px] font-bold text-slate-400">
+        <div className="md:hidden bg-brand-dark border-b border-brand-darker/60 px-4 py-2 flex items-center justify-around gap-1 overflow-x-auto text-[10px] font-bold text-slate-400">
           <button
             onClick={() => setCurrentScreen('dashboard')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 ${
-              currentScreen === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'dashboard' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Painel
@@ -369,7 +369,7 @@ export default function App() {
           <button
             onClick={() => setCurrentScreen('criar')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 ${
-              currentScreen === 'criar' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'criar' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Criar
@@ -377,7 +377,7 @@ export default function App() {
           <button
             onClick={() => setCurrentScreen('aprovacao')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 relative ${
-              currentScreen === 'aprovacao' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'aprovacao' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Moderar
@@ -390,7 +390,7 @@ export default function App() {
           <button
             onClick={() => setCurrentScreen('historico')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 ${
-              currentScreen === 'historico' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'historico' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Histórico
@@ -398,7 +398,7 @@ export default function App() {
           <button
             onClick={() => setCurrentScreen('config')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 ${
-              currentScreen === 'config' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'config' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Params
@@ -406,7 +406,7 @@ export default function App() {
           <button
             onClick={() => setCurrentScreen('logs')}
             className={`px-2.5 py-1 rounded transition-all shrink-0 ${
-              currentScreen === 'logs' ? 'bg-indigo-600 text-white font-bold' : ''
+              currentScreen === 'logs' ? 'bg-brand-secondary text-brand-darker font-extrabold' : ''
             }`}
           >
             Logs
