@@ -2146,7 +2146,9 @@ app.post("/api/posts/publicar", async (req, res) => {
 async function handleDriveUpload(req: express.Request, res: express.Response) {
   try {
     const actingUser = await getActingUserFromRequest(req);
-    assertCanCreatePosts(actingUser);
+    if (!canCreatePosts(actingUser) && !canApprovePosts(actingUser)) {
+      throw new HttpError(403, `Usuário '${actingUser.email}' não possui permissão para enviar mídias.`);
+    }
     const filename = trimEnv(req.body.filename) || `upload-${Date.now()}`;
     const dataUrl = trimEnv(req.body.base64Data);
     const explicitMimeType = trimEnv(req.body.type) || "application/octet-stream";
@@ -2200,6 +2202,43 @@ async function handleDriveUpload(req: express.Request, res: express.Response) {
     respondWithError(res, error, "Google Drive", "Falha no upload ao Google Drive.");
   }
 }
+
+app.post("/api/posts/:id/media", async (req, res) => {
+  try {
+    const actingUser = await getActingUserFromRequest(req);
+    assertCanApprovePosts(actingUser);
+    const existing = await getPostById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Post não encontrado." });
+    }
+
+    const next = await updatePostRecord(req.params.id, {
+      drive_url: req.body.drive_url || existing.drive_url,
+      drive_file_id: req.body.drive_file_id || existing.drive_file_id,
+      tipo: inferPostType(req.body.tipo, req.body.filename || existing.titulo),
+      atualizado_em: new Date().toISOString(),
+      erro_detalhe: undefined,
+    });
+
+    await createHistoryRecord({
+      post_id: next.id,
+      post_titulo: next.titulo,
+      usuario: actingUser.nome,
+      acao: "Troca de Mídia",
+      observacao: "Mídia atualizada na etapa de moderação.",
+      criado_em: new Date().toISOString(),
+    });
+
+    await addLog("Database", "info", `Mídia do post '${next.titulo}' atualizada na moderação.`, {
+      postId: next.id,
+      driveFileId: next.drive_file_id,
+    });
+
+    return res.json({ success: true, post: next });
+  } catch (error) {
+    respondWithError(res, error, "Database", "Falha ao atualizar a mídia do post.");
+  }
+});
 
 app.post("/api/google/upload", handleDriveUpload);
 app.post("/api/simulate-drive-upload", handleDriveUpload);

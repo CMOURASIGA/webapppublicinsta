@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Post, Usuario } from '../types';
 import { apiFetch } from '../lib/api';
-import { AlertTriangle, ArrowRight, Calendar, ClipboardCheck, Clock, Edit3, Eye, Loader2, Send, User, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Calendar, ClipboardCheck, Clock, Edit3, Eye, Loader2, Send, UploadCloud, User, X } from 'lucide-react';
 
 interface ApproveListProps {
   onWorkflowComplete?: () => void;
@@ -64,7 +64,11 @@ function buildMediaValidation(post: Post, width: number, height: number): MediaV
   const isReel = post.tipo === 'REELS';
 
   if (!width || !height || !Number.isFinite(aspectRatio)) {
-    return { ...DEFAULT_MEDIA_VALIDATION, state: 'error', blockingIssues: ['Não foi possível identificar o tamanho da mídia.'] };
+    return {
+      ...DEFAULT_MEDIA_VALIDATION,
+      state: 'error',
+      blockingIssues: ['Não foi possível identificar o tamanho da mídia.'],
+    };
   }
 
   if (isReel) {
@@ -116,7 +120,11 @@ function InstagramPreview({ post, legenda, hashtags, validation }: { post: Post;
             <span className="text-[8px] text-slate-400">Patrocinado</span>
           </div>
         </div>
-        <div className="flex gap-0.5"><span className="w-1 h-1 rounded-full bg-slate-400"></span><span className="w-1 h-1 rounded-full bg-slate-400"></span><span className="w-1 h-1 rounded-full bg-slate-400"></span></div>
+        <div className="flex gap-0.5">
+          <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+          <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+          <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+        </div>
       </div>
       <div className="relative bg-slate-950" style={{ aspectRatio: `${validation.displayAspectRatio || 1}` }}>
         {post.drive_url ? (
@@ -135,10 +143,14 @@ function InstagramPreview({ post, legenda, hashtags, validation }: { post: Post;
         )}
       </div>
       <div className="px-3 py-2 flex items-center justify-between bg-white text-slate-700">
-        <div className="flex gap-3"><span>♡</span><span>◌</span><span>↗</span></div><span>⌑</span>
+        <div className="flex gap-3"><span>♡</span><span>◌</span><span>↗</span></div>
+        <span>⌑</span>
       </div>
       <div className="px-3.5 pb-4 pt-1 bg-white text-left text-[10px] leading-relaxed max-h-[90px] overflow-y-auto">
-        <p className="text-slate-800"><span className="font-bold mr-1">suamarca_oficial</span><span className="text-slate-600">{legenda || 'Legenda em aprovação'}</span></p>
+        <p className="text-slate-800">
+          <span className="font-bold mr-1">suamarca_oficial</span>
+          <span className="text-slate-600">{legenda || 'Legenda em aprovação'}</span>
+        </p>
         <span className="text-brand-secondary block font-bold mt-1 truncate">{hashtags}</span>
       </div>
       <div className="mx-auto my-2 h-1.5 w-24 rounded-full bg-slate-300"></div>
@@ -150,6 +162,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
   const [pendingPosts, setPendingPosts] = useState<Post[]>([]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedLegenda, setEditedLegenda] = useState('');
   const [editedHashtags, setEditedHashtags] = useState('');
@@ -181,7 +194,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
   };
 
   useEffect(() => {
-    fetchPending();
+    void fetchPending();
   }, []);
 
   useEffect(() => {
@@ -196,20 +209,33 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
         active = false;
       };
     }
-    setMediaValidation({ ...DEFAULT_MEDIA_VALIDATION, state: 'loading', previewLabel: selectedPost.tipo === 'REELS' ? 'Prévia de reel com área segura no feed' : 'Prévia realista do feed' });
+
+    setMediaValidation({
+      ...DEFAULT_MEDIA_VALIDATION,
+      state: 'loading',
+      previewLabel: selectedPost.tipo === 'REELS' ? 'Prévia de reel com área segura no feed' : 'Prévia realista do feed',
+    });
+
     getMediaMetadata(selectedPost.drive_url, selectedPost.tipo)
       .then(({ width, height }) => {
         if (active) setMediaValidation(buildMediaValidation(selectedPost, width, height));
       })
       .catch(() => {
-        if (active) setMediaValidation({ ...DEFAULT_MEDIA_VALIDATION, state: 'error', blockingIssues: ['Não foi possível ler a largura e a altura da mídia.'] });
+        if (active) {
+          setMediaValidation({
+            ...DEFAULT_MEDIA_VALIDATION,
+            state: 'error',
+            blockingIssues: ['Não foi possível ler a largura e a altura da mídia.'],
+          });
+        }
       });
+
     return () => {
       active = false;
     };
   }, [selectedPost]);
 
-  const canProceed = mediaValidation.state === 'ready' && mediaValidation.isFeedCompatible && !loading;
+  const canProceed = mediaValidation.state === 'ready' && mediaValidation.isFeedCompatible && !loading && !uploadingMedia;
 
   const handlePostSelection = (post: Post) => {
     setSelectedPost(post);
@@ -232,22 +258,87 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
         const data = await res.json();
         setSelectedPost(data.post);
         setIsEditing(false);
-        fetchPending();
+        await fetchPending();
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const approvalPayload = selectedPost ? {
-    action: 'instant',
-    mediaValidation: {
-      width: mediaValidation.width,
-      height: mediaValidation.height,
-      aspectRatio: mediaValidation.aspectRatio,
-      isFeedCompatible: mediaValidation.isFeedCompatible,
-    },
-  } : null;
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Falha ao ler o arquivo selecionado.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleReplaceMedia = async (file: File) => {
+    if (!selectedPost) return;
+    setUploadingMedia(true);
+
+    try {
+      const base64Data = await readFileAsDataUrl(file);
+      const uploadRes = await apiFetch('/api/google/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          type: file.type,
+          sizeBytes: file.size,
+          base64Data,
+        }),
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.success) {
+        throw new Error(uploadData.error || 'Falha ao enviar a nova mídia.');
+      }
+
+      const updateRes = await apiFetch(`/api/posts/${selectedPost.id}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_url: uploadData.url,
+          drive_file_id: uploadData.fileId,
+          tipo: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGEM',
+          filename: file.name,
+        }),
+      });
+
+      const updateData = await updateRes.json();
+      if (!updateRes.ok || !updateData.post) {
+        throw new Error(updateData.error || 'Falha ao atualizar a mídia do post.');
+      }
+
+      setSelectedPost(updateData.post);
+      await fetchPending();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Falha ao atualizar a mídia.');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files?.[0]) {
+      await handleReplaceMedia(event.target.files[0]);
+      event.target.value = '';
+    }
+  };
+
+  const approvalPayload = selectedPost
+    ? {
+        action: 'instant',
+        mediaValidation: {
+          width: mediaValidation.width,
+          height: mediaValidation.height,
+          aspectRatio: mediaValidation.aspectRatio,
+          isFeedCompatible: mediaValidation.isFeedCompatible,
+        },
+      }
+    : null;
 
   const handlePublishNow = async () => {
     if (!selectedPost || !approvalPayload) return;
@@ -263,7 +354,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
         body: JSON.stringify(approvalPayload),
       });
       if (res.ok) {
-        fetchPending();
+        await fetchPending();
         onWorkflowComplete?.();
       }
     } catch (err) {
@@ -298,7 +389,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
       });
       if (res.ok) {
         setShowScheduleForm(false);
-        fetchPending();
+        await fetchPending();
         onWorkflowComplete?.();
       }
     } catch (err) {
@@ -323,7 +414,7 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
       if (res.ok) {
         setShowRejectModal(false);
         setRejectReason('');
-        fetchPending();
+        await fetchPending();
         onWorkflowComplete?.();
       }
     } catch (err) {
@@ -354,9 +445,17 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
           ) : (
             <div className="space-y-2.5 max-h-[580px] overflow-y-auto pr-1">
               {pendingPosts.map((post) => (
-                <button key={post.id} onClick={() => handlePostSelection(post)} className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 ${selectedPost?.id === post.id ? 'border-brand-secondary bg-brand-light shadow-sm ring-2 ring-brand-primary/10' : 'border-slate-250 bg-white hover:bg-slate-50'}`}>
+                <button
+                  key={post.id}
+                  onClick={() => handlePostSelection(post)}
+                  className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 ${
+                    selectedPost?.id === post.id ? 'border-brand-secondary bg-brand-light shadow-sm ring-2 ring-brand-primary/10' : 'border-slate-250 bg-white hover:bg-slate-50'
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2 w-full">
-                    <span className="text-[10px] font-bold text-brand-secondary uppercase bg-brand-light border border-brand-primary/20 px-2 py-0.5 rounded">{post.tipo === 'VIDEO' ? 'Vídeo' : post.tipo === 'REELS' ? 'Reel' : 'Imagem'}</span>
+                    <span className="text-[10px] font-bold text-brand-secondary uppercase bg-brand-light border border-brand-primary/20 px-2 py-0.5 rounded">
+                      {post.tipo === 'VIDEO' ? 'Vídeo' : post.tipo === 'REELS' ? 'Reel' : 'Imagem'}
+                    </span>
                     <span className="text-[10px] text-slate-400">{new Date(post.criado_em).toLocaleDateString('pt-BR')}</span>
                   </div>
                   <div>
@@ -389,21 +488,31 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                     <span>Criado em: {new Date(selectedPost.criado_em).toLocaleString('pt-BR')}</span>
                   </div>
                 </div>
-                <button onClick={() => setIsEditing(!isEditing)} className="p-2 sm:px-3 text-xs font-semibold text-slate-700 bg-slate-55 border border-slate-200 rounded-lg flex items-center gap-1.5 shrink-0">
-                  <Edit3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">{isEditing ? 'Cancelar Edição' : 'Editar Legenda'}</span>
-                </button>
+                <div className="flex gap-2">
+                  <input id="replace-post-media-input" type="file" accept="image/*,video/mp4,video/quicktime,video/webm" onChange={handleFileInputChange} className="hidden" />
+                  <label htmlFor="replace-post-media-input" className="p-2 sm:px-3 text-xs font-semibold text-slate-700 bg-slate-55 border border-slate-200 rounded-lg flex items-center gap-1.5 shrink-0 cursor-pointer">
+                    {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{uploadingMedia ? 'Enviando Mídia' : 'Trocar Mídia'}</span>
+                  </label>
+                  <button onClick={() => setIsEditing(!isEditing)} className="p-2 sm:px-3 text-xs font-semibold text-slate-700 bg-slate-55 border border-slate-200 rounded-lg flex items-center gap-1.5 shrink-0">
+                    <Edit3 className="w-4 h-4" />
+                    <span className="hidden sm:inline">{isEditing ? 'Cancelar Edição' : 'Editar Legenda'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
                 <div className="md:col-span-5 space-y-3">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{mediaValidation.previewLabel}</span>
-                  <InstagramPreview post={selectedPost} legenda={isEditing ? editedLegenda : selectedPost.legenda} hashtags={isEditing ? editedHashtags : (selectedPost.hashtags || '')} validation={mediaValidation} />
+                  <InstagramPreview post={selectedPost} legenda={isEditing ? editedLegenda : selectedPost.legenda} hashtags={isEditing ? editedHashtags : selectedPost.hashtags || ''} validation={mediaValidation} />
+                  <p className="text-[11px] text-slate-500">
+                    Use <strong>Trocar Mídia</strong> para subir uma nova arte e revalidar automaticamente antes da publicação.
+                  </p>
                   <div className={`rounded-xl border p-3 text-xs ${mediaValidation.isFeedCompatible && mediaValidation.state === 'ready' ? 'border-emerald-200 bg-emerald-50/80' : 'border-amber-200 bg-amber-50/80'}`}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold uppercase tracking-wide text-[10px] text-slate-500">Validação Instagram</span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${mediaValidation.isFeedCompatible && mediaValidation.state === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {mediaValidation.state === 'loading' ? 'Lendo mídia' : mediaValidation.isFeedCompatible && mediaValidation.state === 'ready' ? 'Apta para publicar' : 'Ajuste necessário'}
+                        {mediaValidation.state === 'loading' || uploadingMedia ? 'Lendo mídia' : mediaValidation.isFeedCompatible && mediaValidation.state === 'ready' ? 'Apta para publicar' : 'Ajuste necessário'}
                       </span>
                     </div>
                     {mediaValidation.state === 'ready' && (
@@ -428,8 +537,18 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Texto de Legenda</span><div className="bg-slate-50/50 p-4 border border-slate-100 rounded-xl text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedPost.legenda || <span className="italic text-slate-400">Nenhuma legenda cadastrada.</span>}</div></div>
-                      {selectedPost.hashtags && <div><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Hashtags Estratégicas</span><p className="text-xs text-indigo-600 font-semibold tracking-wide bg-indigo-50/30 p-2.5 rounded-lg border border-indigo-100/30">{selectedPost.hashtags}</p></div>}
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Texto de Legenda</span>
+                        <div className="bg-slate-50/50 p-4 border border-slate-100 rounded-xl text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                          {selectedPost.legenda || <span className="italic text-slate-400">Nenhuma legenda cadastrada.</span>}
+                        </div>
+                      </div>
+                      {selectedPost.hashtags && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Hashtags Estratégicas</span>
+                          <p className="text-xs text-indigo-600 font-semibold tracking-wide bg-indigo-50/30 p-2.5 rounded-lg border border-indigo-100/30">{selectedPost.hashtags}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -438,8 +557,27 @@ export default function ApproveList({ onWorkflowComplete, currentUser }: Approve
               {!showRejectModal && !showScheduleForm && (
                 <div className="border-t border-slate-100 pt-5 flex flex-wrap gap-3">
                   <button onClick={() => setShowRejectModal(true)} className="flex-1 min-w-[130px] py-2.5 border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5"><X className="w-4 h-4" /> Reprovar / Solicitar Ajustes</button>
-                  <button onClick={() => { if (!canProceed) return; setShowScheduleForm(true); const inOneHour = new Date(Date.now() + 60 * 60 * 1000); const year = inOneHour.getFullYear(); const month = String(inOneHour.getMonth() + 1).padStart(2, '0'); const day = String(inOneHour.getDate()).padStart(2, '0'); const hours = String(inOneHour.getHours()).padStart(2, '0'); const minutes = String(inOneHour.getMinutes()).padStart(2, '0'); setScheduleDateTime(`${year}-${month}-${day}T${hours}:${minutes}`); }} disabled={!canProceed} className="flex-1 min-w-[130px] py-2.5 border border-slate-200 bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5"><Calendar className="w-4 h-4" /> Agendar Publicação</button>
-                  <button onClick={handlePublishNow} disabled={!canProceed} className="flex-1 min-w-[150px] py-2.5 bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed text-brand-darker text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-brand-primary/15">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-amber-300" />} Aprovar e Publicar Agora</button>
+                  <button
+                    onClick={() => {
+                      if (!canProceed) return;
+                      setShowScheduleForm(true);
+                      const inOneHour = new Date(Date.now() + 60 * 60 * 1000);
+                      const year = inOneHour.getFullYear();
+                      const month = String(inOneHour.getMonth() + 1).padStart(2, '0');
+                      const day = String(inOneHour.getDate()).padStart(2, '0');
+                      const hours = String(inOneHour.getHours()).padStart(2, '0');
+                      const minutes = String(inOneHour.getMinutes()).padStart(2, '0');
+                      setScheduleDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+                    }}
+                    disabled={!canProceed}
+                    className="flex-1 min-w-[130px] py-2.5 border border-slate-200 bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5"
+                  >
+                    <Calendar className="w-4 h-4" /> Agendar Publicação
+                  </button>
+                  <button onClick={handlePublishNow} disabled={!canProceed} className="flex-1 min-w-[150px] py-2.5 bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed text-brand-darker text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-brand-primary/15">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-amber-300" />}
+                    Aprovar e Publicar Agora
+                  </button>
                 </div>
               )}
 
