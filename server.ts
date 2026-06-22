@@ -2,7 +2,6 @@ import { createHmac, createSign, randomUUID } from "crypto";
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { HistoricoPost, LogMessage, PerfilPublicacao, Post, SettingsConfig, Usuario } from "./src/types";
 
@@ -2359,6 +2358,7 @@ export async function initializeApp() {
 
     if (!isVercelRuntime) {
       if (process.env.NODE_ENV !== "production") {
+        const { createServer: createViteServer } = await import("vite");
         const vite = await createViteServer({
           server: { middlewareMode: true },
           appType: "spa",
