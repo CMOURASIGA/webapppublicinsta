@@ -21,6 +21,11 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
   const [users, setUsers] = useState<EditableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<PerfilPublicacao>('CRIADOR');
+  const [creating, setCreating] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -80,6 +85,46 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
     }
   };
 
+  const createUser = async () => {
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      alert('Preencha nome, e-mail e senha provisória.');
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      const res = await apiFetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: newUserName.trim(),
+          email: newUserEmail.trim(),
+          password: newUserPassword,
+          perfil_publicacao: newUserRole,
+          ativo: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.user) {
+        throw new Error(data.error || 'Falha ao criar o usuário.');
+      }
+
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserRole('CRIADOR');
+      await loadUsers();
+      await onUsersChanged?.();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Falha ao criar o usuário.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -97,6 +142,62 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
           {error}
         </div>
       )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-slate-800">Novo usuário</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Este fluxo cria a conta no Supabase Auth e também o cadastro operacional do sistema.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <input
+            type="text"
+            value={newUserName}
+            onChange={(event) => setNewUserName(event.target.value)}
+            placeholder="Nome completo"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+          />
+          <input
+            type="email"
+            value={newUserEmail}
+            onChange={(event) => setNewUserEmail(event.target.value)}
+            placeholder="email@empresa.com"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+          />
+          <input
+            type="text"
+            value={newUserPassword}
+            onChange={(event) => setNewUserPassword(event.target.value)}
+            placeholder="Senha provisória"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+          />
+          <select
+            value={newUserRole}
+            onChange={(event) => setNewUserRole(event.target.value as PerfilPublicacao)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+          >
+            {roleOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={creating}
+            onClick={() => void createUser()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-secondary px-4 py-2 text-xs font-bold text-brand-darker transition-colors hover:bg-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Users className="h-4 w-4" />
+            {creating ? 'Criando...' : 'Criar usuário'}
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="grid grid-cols-12 gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">

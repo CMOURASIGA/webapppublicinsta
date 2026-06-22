@@ -641,6 +641,88 @@ async function updateUserRecord(id, patch) {
   usuariosColumnsCache = null;
   return mapSupabaseUserRecord(updated[0]);
 }
+async function createOperationalUserRecord(payload) {
+  if (!await canUseSupabase()) {
+    const record = {
+      id: (0, import_crypto.randomUUID)(),
+      nome: payload.nome,
+      email: payload.email,
+      perfil: payload.perfil_publicacao === "ADMIN" ? "ADMINISTRADOR" : "USUARIO",
+      perfil_publicacao: payload.perfil_publicacao,
+      ativo: payload.ativo,
+      criado_em: (/* @__PURE__ */ new Date()).toISOString(),
+      auth_user_id: payload.auth_user_id
+    };
+    memoryStore.usuarios.push(record);
+    return record;
+  }
+  const columns = await getUsuariosColumns();
+  const body = {
+    nome: payload.nome,
+    email: payload.email,
+    perfil: payload.perfil_publicacao === "ADMIN" ? "ADMIN" : "OPERADOR",
+    atualizado_em: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (columns.includes("auth_user_id") && payload.auth_user_id) {
+    body.auth_user_id = payload.auth_user_id;
+  }
+  if (columns.includes("perfil_publicacao")) {
+    body.perfil_publicacao = payload.perfil_publicacao;
+  }
+  if (columns.includes("status")) {
+    body.status = payload.ativo ? "ATIVO" : "INATIVO";
+  }
+  if (columns.includes("ativo")) {
+    body.ativo = payload.ativo;
+  }
+  if (columns.includes("origem_dado")) {
+    body.origem_dado = "SISTEMA";
+  }
+  if (columns.includes("criado_via_sistema")) {
+    body.criado_via_sistema = true;
+  }
+  const created = await supabaseRequest("usuarios", {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(body)
+  });
+  if (!created[0]) {
+    throw new Error("Falha ao criar usu\xE1rio operacional.");
+  }
+  usuariosColumnsCache = null;
+  return mapSupabaseUserRecord(created[0]);
+}
+async function createSupabaseAuthUser(payload) {
+  const config = getRuntimeConfig();
+  const response = await fetch(`${config.supabaseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      email: payload.email,
+      password: payload.password,
+      email_confirm: true,
+      user_metadata: {
+        nome: payload.nome
+      }
+    })
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Falha ao criar usu\xE1rio no Supabase Auth: ${text}`);
+  }
+  const data = JSON.parse(text);
+  const authUserId = data.user?.id || data.id;
+  if (!authUserId) {
+    throw new Error("Supabase Auth n\xE3o retornou o ID do usu\xE1rio criado.");
+  }
+  return authUserId;
+}
 function getAuthorizationToken(headerValue) {
   const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   const match = (rawValue || "").match(/^Bearer\s+(.+)$/i);
@@ -1355,16 +1437,11 @@ app.delete("/api/posts/:id", async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: "Post n\xE3o encontrado." });
     }
-    await createHistoryRecord({
-      post_id: deleted.id,
-      post_titulo: deleted.titulo,
-      usuario: actingUser.nome,
-      acao: "Remo\xE7\xE3o de Post",
-      observacao: "Post exclu\xEDdo do sistema.",
-      criado_em: (/* @__PURE__ */ new Date()).toISOString()
-    });
     await addLog("Database", "warn", `Post '${deleted.titulo}' removido.`, {
-      postId: deleted.id
+      postId: deleted.id,
+      postTitle: deleted.titulo,
+      actor: actingUser.nome,
+      action: "Remo\xE7\xE3o de Post"
     });
     res.json({ success: true });
   } catch (error) {
@@ -1897,6 +1974,53 @@ app.get("/api/users", async (req, res) => {
     res.json({ users: await listUsers() });
   } catch (error) {
     respondWithError(res, error, "Database", "Falha ao listar usu\xE1rios.");
+  }
+});
+app.post("/api/users", async (req, res) => {
+  try {
+    const actingUser = await getActingUserFromRequest(req);
+    assertIsAdmin(actingUser);
+    const nome = trimEnv(req.body.nome);
+    const email = trimEnv(req.body.email).toLowerCase();
+    const password = String(req.body.password || "").trim();
+    const perfilPublicacao = inferPerfilPublicacaoFromRawValue(req.body.perfil_publicacao || "CRIADOR");
+    const ativo = req.body.ativo === void 0 ? true : Boolean(req.body.ativo);
+    if (!nome) {
+      return res.status(400).json({ error: "Nome \xE9 obrigat\xF3rio." });
+    }
+    if (!email) {
+      return res.status(400).json({ error: "E-mail \xE9 obrigat\xF3rio." });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: "Senha provis\xF3ria deve ter ao menos 6 caracteres." });
+    }
+    const existingUsers = await listUsers();
+    if (existingUsers.some((user) => user.email.toLowerCase() === email)) {
+      return res.status(409).json({ error: "J\xE1 existe usu\xE1rio operacional cadastrado com este e-mail." });
+    }
+    const roleColumnAvailable = await hasUsuariosRoleColumn();
+    if (!roleColumnAvailable && perfilPublicacao === "APROVADOR") {
+      return res.status(400).json({
+        error: "A tabela usuarios ainda n\xE3o possui a coluna perfil_publicacao. Neste ambiente s\xF3 \xE9 poss\xEDvel usar Administrador ou Criador."
+      });
+    }
+    const authUserId = await createSupabaseAuthUser({ email, password, nome });
+    const created = await createOperationalUserRecord({
+      nome,
+      email,
+      ativo,
+      perfil_publicacao: perfilPublicacao,
+      auth_user_id: authUserId
+    });
+    await addLog("Database", "success", `Usu\xE1rio '${created.email}' criado pelo painel.`, {
+      userId: created.id,
+      authUserId,
+      perfil_publicacao: created.perfil_publicacao,
+      ativo: created.ativo
+    });
+    res.status(201).json({ success: true, user: created });
+  } catch (error) {
+    respondWithError(res, error, "Database", "Falha ao criar usu\xE1rio.");
   }
 });
 app.put("/api/users/:id", async (req, res) => {
