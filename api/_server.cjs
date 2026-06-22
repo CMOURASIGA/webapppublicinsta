@@ -347,6 +347,34 @@ function maskError(error) {
   }
   return String(error);
 }
+function assertPostMediaValidation(payload, post) {
+  if (!post.drive_url) {
+    throw new HttpError(400, "A postagem precisa ter uma m\xEDdia p\xFAblica vinculada antes da publica\xE7\xE3o.");
+  }
+  if (!payload || typeof payload !== "object") {
+    throw new HttpError(400, "A valida\xE7\xE3o da m\xEDdia \xE9 obrigat\xF3ria antes de agendar ou publicar.");
+  }
+  const candidate = payload;
+  const width = typeof candidate.width === "number" ? candidate.width : Number(candidate.width);
+  const height = typeof candidate.height === "number" ? candidate.height : Number(candidate.height);
+  const aspectRatio = typeof candidate.aspectRatio === "number" ? candidate.aspectRatio : Number(candidate.aspectRatio);
+  const isFeedCompatible = candidate.isFeedCompatible === true;
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 || !Number.isFinite(aspectRatio)) {
+    throw new HttpError(400, "A valida\xE7\xE3o da m\xEDdia retornou dimens\xF5es inv\xE1lidas.");
+  }
+  if (!isFeedCompatible) {
+    throw new HttpError(400, "A m\xEDdia n\xE3o passou na valida\xE7\xE3o para o feed do Instagram.");
+  }
+  if (post.tipo === "REELS") {
+    if (aspectRatio < 0.56 || aspectRatio > 0.8) {
+      throw new HttpError(400, "Reels devem estar entre 9:16 e 4:5 para publica\xE7\xE3o consistente.");
+    }
+    return;
+  }
+  if (aspectRatio < 0.8 || aspectRatio > 1.91) {
+    throw new HttpError(400, "Posts de feed devem usar propor\xE7\xE3o entre 4:5 e 1.91:1.");
+  }
+}
 function escapeHtml(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -1590,6 +1618,7 @@ app.post("/api/posts/:id/approve", async (req, res) => {
       return res.status(404).json({ error: "Post n\xE3o encontrado." });
     }
     const action = req.body.action === "schedule" ? "schedule" : "instant";
+    assertPostMediaValidation(req.body.mediaValidation, post);
     if (action === "schedule") {
       const appointmentTime = req.body.appointmentTime;
       if (!appointmentTime) {
@@ -1648,6 +1677,7 @@ app.post("/api/posts/aprovar", async (req, res) => {
       return res.status(404).json({ error: "Post n\xE3o encontrado." });
     }
     const action = req.body.action === "schedule" ? "schedule" : "instant";
+    assertPostMediaValidation(req.body.mediaValidation, post);
     if (action === "schedule") {
       const appointmentTime = req.body.appointmentTime;
       if (!appointmentTime) {
@@ -2235,3 +2265,4 @@ var server_default = app;
 0 && (module.exports = {
   initializeApp
 });
+//# sourceMappingURL=server.cjs.map
