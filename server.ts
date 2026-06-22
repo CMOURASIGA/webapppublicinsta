@@ -40,6 +40,7 @@ interface RuntimeConfig {
   instagramGraphBaseUrl: string;
   facebookPageId: string;
   metaVerifyToken: string;
+  n8nApprovalWebhookUrl: string;
   mediaUrlSigningSecret: string;
   supabaseConfigured: boolean;
   googleConfigured: boolean;
@@ -201,6 +202,7 @@ function getRuntimeConfig(): RuntimeConfig {
   const metaAppSecret = trimEnv(process.env.META_APP_SECRET);
   const metaRedirectUri = trimEnv(process.env.META_REDIRECT_URI);
   const metaVerifyToken = trimEnv(process.env.META_VERIFY_TOKEN);
+  const n8nApprovalWebhookUrl = trimEnv(process.env.N8N_APPROVAL_WEBHOOK_URL);
   const appUrl = normalizeAppUrl(trimEnv(process.env.APP_URL));
   const geminiModel = trimEnv(process.env.GEMINI_MODEL) || "gemini-3.5-flash";
   const mediaUrlSigningSecret = trimEnv(process.env.MEDIA_URL_SIGNING_SECRET) || "local-media-secret";
@@ -253,6 +255,7 @@ function getRuntimeConfig(): RuntimeConfig {
     instagramGraphBaseUrl,
     facebookPageId,
     metaVerifyToken,
+    n8nApprovalWebhookUrl,
     mediaUrlSigningSecret,
     supabaseConfigured,
     googleConfigured,
@@ -1313,6 +1316,58 @@ async function instagramGraphRequest<T>(resource: string, init?: RequestInit): P
   return safeParseJson<T>(response);
 }
 
+function mapPostTypeForApprovalWebhook(tipo: Post["tipo"]): "IMAGE" | "VIDEO" | "REELS" {
+  if (tipo === "VIDEO") return "VIDEO";
+  if (tipo === "REELS") return "REELS";
+  return "IMAGE";
+}
+
+async function notifyPendingApprovalWebhook(post: Post): Promise<void> {
+  const config = getRuntimeConfig();
+  if (!config.n8nApprovalWebhookUrl) {
+    return;
+  }
+
+  const payload = {
+    event: "post_pending_approval",
+    post: {
+      id: post.id,
+      titulo: post.titulo,
+      legenda: post.legenda,
+      tipo: mapPostTypeForApprovalWebhook(post.tipo),
+      status: "PENDENTE" as const,
+      media_url: post.drive_url || "",
+      approval_url: `${config.appUrl}/posts/${encodeURIComponent(post.id)}`,
+      created_at: post.criado_em,
+    },
+  };
+
+  try {
+    const response = await fetch(config.n8nApprovalWebhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`n8n webhook ${response.status}: ${await response.text()}`);
+    }
+
+    await addLog("Database", "info", "Webhook de aprovação enviado ao n8n.", {
+      postId: post.id,
+      webhookUrl: config.n8nApprovalWebhookUrl,
+    });
+  } catch (error) {
+    await addLog("Database", "warn", "Falha ao enviar webhook de aprovação ao n8n.", {
+      postId: post.id,
+      webhookUrl: config.n8nApprovalWebhookUrl,
+      error: maskError(error),
+    });
+  }
+}
+
 async function createInstagramContainer(post: Post): Promise<string> {
   const config = getRuntimeConfig();
   const publishingActorId = getInstagramPublishingActorId();
@@ -1527,6 +1582,8 @@ async function importGoogleDrivePosts(author: string): Promise<Post[]> {
       observacao: `Arquivo '${file.name}' importado automaticamente da pasta monitorada.`,
       criado_em: now,
     });
+
+    await notifyPendingApprovalWebhook(created);
 
     createdPosts.push(created);
   }
@@ -1744,6 +1801,10 @@ app.post("/api/posts", async (req, res) => {
       status: created.status,
     });
 
+    if (created.status === "PENDENTE") {
+      await notifyPendingApprovalWebhook(created);
+    }
+
     res.status(201).json({ success: true, post: created });
   } catch (error) {
     respondWithError(res, error, "Database", "Falha ao criar post.");
@@ -1783,6 +1844,10 @@ app.put("/api/posts/:id", async (req, res) => {
     await addLog("Database", "info", `Post '${next.titulo}' atualizado.`, {
       postId: next.id,
     });
+
+    if (next.status === "PENDENTE") {
+      await notifyPendingApprovalWebhook(next);
+    }
 
     res.json({ success: true, post: next });
   } catch (error) {
@@ -1835,6 +1900,8 @@ app.post("/api/posts/:id/submit", async (req, res) => {
       observacao: "Post encaminhado para moderação.",
       criado_em: new Date().toISOString(),
     });
+
+    await notifyPendingApprovalWebhook(next);
 
     res.json({ success: true, post: next });
   } catch (error) {

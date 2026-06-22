@@ -135,13 +135,16 @@ function getRuntimeConfig() {
   const googleClientEmail = trimEnv(process.env.GOOGLE_CLIENT_EMAIL);
   const googlePrivateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
   const instagramAccessToken = trimEnv(process.env.INSTAGRAM_ACCESS_TOKEN);
+  const instagramUserId = trimEnv(process.env.INSTAGRAM_USER_ID);
   const instagramBusinessId = trimEnv(process.env.INSTAGRAM_BUSINESS_ID);
+  const instagramGraphBaseUrl = trimEnv(process.env.INSTAGRAM_GRAPH_BASE_URL) || "https://graph.facebook.com";
   const facebookPageId = trimEnv(process.env.FACEBOOK_PAGE_ID);
   const graphApiVersion = trimEnv(process.env.GRAPH_API_VERSION) || "v23.0";
   const metaAppId = trimEnv(process.env.META_APP_ID);
   const metaAppSecret = trimEnv(process.env.META_APP_SECRET);
   const metaRedirectUri = trimEnv(process.env.META_REDIRECT_URI);
   const metaVerifyToken = trimEnv(process.env.META_VERIFY_TOKEN);
+  const n8nApprovalWebhookUrl = trimEnv(process.env.N8N_APPROVAL_WEBHOOK_URL);
   const appUrl = normalizeAppUrl(trimEnv(process.env.APP_URL));
   const geminiModel = trimEnv(process.env.GEMINI_MODEL) || "gemini-3.5-flash";
   const mediaUrlSigningSecret = trimEnv(process.env.MEDIA_URL_SIGNING_SECRET) || "local-media-secret";
@@ -149,7 +152,7 @@ function getRuntimeConfig() {
   const googleConfigured = Boolean(
     googleDriveFolderId && (googleClientEmail && googlePrivateKey || googleClientId && googleClientSecret && googleRefreshToken)
   );
-  const instagramConfigured = Boolean(instagramAccessToken && instagramBusinessId);
+  const instagramConfigured = Boolean(instagramAccessToken && (instagramUserId || instagramBusinessId));
   const geminiConfigured = Boolean(trimEnv(process.env.GEMINI_API_KEY));
   const missingEnv = [];
   if (!supabaseConfigured) missingEnv.push("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
@@ -161,7 +164,7 @@ function getRuntimeConfig() {
     );
   }
   if (!instagramAccessToken) missingEnv.push("INSTAGRAM_ACCESS_TOKEN");
-  if (!instagramBusinessId) missingEnv.push("INSTAGRAM_BUSINESS_ID");
+  if (!instagramUserId && !instagramBusinessId) missingEnv.push("INSTAGRAM_USER_ID ou INSTAGRAM_BUSINESS_ID");
   const operationalMode = mode === "REAL" && supabaseConfigured && googleConfigured && instagramConfigured ? "REAL" : "SIMULATOR";
   return {
     appUrl,
@@ -183,9 +186,12 @@ function getRuntimeConfig() {
     metaAppSecret,
     metaRedirectUri,
     instagramAccessToken,
+    instagramUserId,
     instagramBusinessId,
+    instagramGraphBaseUrl,
     facebookPageId,
     metaVerifyToken,
+    n8nApprovalWebhookUrl,
     mediaUrlSigningSecret,
     supabaseConfigured,
     googleConfigured,
@@ -307,7 +313,8 @@ async function getSettingsView() {
     missingSupabaseTables: schemaState.missingTables,
     googleDriveFolderId: config.googleDriveFolderId,
     googleConfigured: config.googleConfigured,
-    instagramBusinessId: config.instagramBusinessId,
+    instagramBusinessId: config.instagramUserId || config.instagramBusinessId,
+    instagramGraphBaseUrl: config.instagramGraphBaseUrl,
     facebookPageId: config.facebookPageId,
     instagramConfigured: config.instagramConfigured,
     geminiModel: config.geminiModel,
@@ -1041,8 +1048,68 @@ async function metaGraphRequest(resource, init) {
   }
   return safeParseJson(response);
 }
+function getInstagramPublishingActorId() {
+  const config = getRuntimeConfig();
+  return config.instagramUserId || config.instagramBusinessId;
+}
+async function instagramGraphRequest(resource, init) {
+  const config = getRuntimeConfig();
+  const baseUrl = config.instagramGraphBaseUrl.replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/${config.graphApiVersion}${resource}`, init);
+  if (!response.ok) {
+    throw new Error(`Instagram Graph ${response.status}: ${await response.text()}`);
+  }
+  return safeParseJson(response);
+}
+function mapPostTypeForApprovalWebhook(tipo) {
+  if (tipo === "VIDEO") return "VIDEO";
+  if (tipo === "REELS") return "REELS";
+  return "IMAGE";
+}
+async function notifyPendingApprovalWebhook(post) {
+  const config = getRuntimeConfig();
+  if (!config.n8nApprovalWebhookUrl) {
+    return;
+  }
+  const payload = {
+    event: "post_pending_approval",
+    post: {
+      id: post.id,
+      titulo: post.titulo,
+      legenda: post.legenda,
+      tipo: mapPostTypeForApprovalWebhook(post.tipo),
+      status: "PENDENTE",
+      media_url: post.drive_url || "",
+      approval_url: `${config.appUrl}/posts/${encodeURIComponent(post.id)}`,
+      created_at: post.criado_em
+    }
+  };
+  try {
+    const response = await fetch(config.n8nApprovalWebhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error(`n8n webhook ${response.status}: ${await response.text()}`);
+    }
+    await addLog("Database", "info", "Webhook de aprova\xE7\xE3o enviado ao n8n.", {
+      postId: post.id,
+      webhookUrl: config.n8nApprovalWebhookUrl
+    });
+  } catch (error) {
+    await addLog("Database", "warn", "Falha ao enviar webhook de aprova\xE7\xE3o ao n8n.", {
+      postId: post.id,
+      webhookUrl: config.n8nApprovalWebhookUrl,
+      error: maskError(error)
+    });
+  }
+}
 async function createInstagramContainer(post) {
   const config = getRuntimeConfig();
+  const publishingActorId = getInstagramPublishingActorId();
   const body = new URLSearchParams({
     access_token: config.instagramAccessToken,
     caption: buildCaption(post)
@@ -1059,7 +1126,7 @@ async function createInstagramContainer(post) {
     }
     body.set("image_url", post.drive_url);
   }
-  const result = await metaGraphRequest(`/${config.instagramBusinessId}/media`, {
+  const result = await instagramGraphRequest(`/${publishingActorId}/media`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -1071,7 +1138,7 @@ async function createInstagramContainer(post) {
 async function waitForContainerReady(containerId) {
   const config = getRuntimeConfig();
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const status = await metaGraphRequest(
+    const status = await instagramGraphRequest(
       `/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(config.instagramAccessToken)}`
     );
     const code = status.status_code || status.status;
@@ -1087,11 +1154,12 @@ async function waitForContainerReady(containerId) {
 }
 async function publishInstagramContainer(creationId) {
   const config = getRuntimeConfig();
+  const publishingActorId = getInstagramPublishingActorId();
   const publishBody = new URLSearchParams({
     creation_id: creationId,
     access_token: config.instagramAccessToken
   });
-  const published = await metaGraphRequest(`/${config.instagramBusinessId}/media_publish`, {
+  const published = await instagramGraphRequest(`/${publishingActorId}/media_publish`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -1100,7 +1168,7 @@ async function publishInstagramContainer(creationId) {
   });
   let permalink;
   try {
-    const media = await metaGraphRequest(
+    const media = await instagramGraphRequest(
       `/${published.id}?fields=permalink&access_token=${encodeURIComponent(config.instagramAccessToken)}`
     );
     permalink = media.permalink;
@@ -1116,7 +1184,8 @@ async function publishPost(post, author) {
   await addLog("Instagram API", "info", `Iniciando publica\xE7\xE3o do post '${post.titulo}'.`, {
     postId: post.id,
     postType: post.tipo,
-    businessId: getRuntimeConfig().instagramBusinessId
+    publishingActorId: getInstagramPublishingActorId(),
+    graphBaseUrl: getRuntimeConfig().instagramGraphBaseUrl
   });
   if (!await canUseRealMode()) {
     const simulated = await updatePostRecord(post.id, {
@@ -1221,6 +1290,7 @@ async function importGoogleDrivePosts(author) {
       observacao: `Arquivo '${file.name}' importado automaticamente da pasta monitorada.`,
       criado_em: now
     });
+    await notifyPendingApprovalWebhook(created);
     createdPosts.push(created);
   }
   await addLog("Google Drive", "success", "Importa\xE7\xE3o do Google Drive conclu\xEDda.", {
@@ -1389,6 +1459,9 @@ app.post("/api/posts", async (req, res) => {
       postId: created.id,
       status: created.status
     });
+    if (created.status === "PENDENTE") {
+      await notifyPendingApprovalWebhook(created);
+    }
     res.status(201).json({ success: true, post: created });
   } catch (error) {
     respondWithError(res, error, "Database", "Falha ao criar post.");
@@ -1424,6 +1497,9 @@ app.put("/api/posts/:id", async (req, res) => {
     await addLog("Database", "info", `Post '${next.titulo}' atualizado.`, {
       postId: next.id
     });
+    if (next.status === "PENDENTE") {
+      await notifyPendingApprovalWebhook(next);
+    }
     res.json({ success: true, post: next });
   } catch (error) {
     respondWithError(res, error, "Database", "Falha ao atualizar post.");
@@ -1469,6 +1545,7 @@ app.post("/api/posts/:id/submit", async (req, res) => {
       observacao: "Post encaminhado para modera\xE7\xE3o.",
       criado_em: (/* @__PURE__ */ new Date()).toISOString()
     });
+    await notifyPendingApprovalWebhook(next);
     res.json({ success: true, post: next });
   } catch (error) {
     respondWithError(res, error, "Database", "Falha ao enviar post para aprova\xE7\xE3o.");
@@ -2158,4 +2235,3 @@ var server_default = app;
 0 && (module.exports = {
   initializeApp
 });
-//# sourceMappingURL=server.cjs.map
