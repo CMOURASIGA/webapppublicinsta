@@ -1,0 +1,377 @@
+# IMPLEMENTAÇÕES PENDENTES DO WEBAPP DE APROVAÇÃO E PUBLICAÇÃO NO INSTAGRAM
+
+## Situação Atual
+
+O projeto está funcional como MVP, porém ainda utiliza algumas simulações. Para entrar em produção será necessário substituir os componentes simulados pelas integrações reais.
+
+---
+
+# 1. BANCO DE DADOS
+
+## Situação Atual
+
+O sistema utiliza:
+
+```text
+db_storage.json
+```
+
+como armazenamento local.
+
+## Implementação Necessária
+
+Migrar toda a persistência para Supabase PostgreSQL.
+
+### Tabelas
+
+* posts
+* usuarios
+* historico_posts
+
+---
+
+# 2. GOOGLE DRIVE
+
+## Situação Atual
+
+O upload é simulado.
+
+Endpoint:
+
+```text
+/api/simulate-drive-upload
+```
+
+## Implementação Necessária
+
+Substituir pela Google Drive API.
+
+Fluxo:
+
+```text
+Upload
+↓
+Google Drive
+↓
+Retorno do fileId
+↓
+Salvar no banco
+```
+
+### Estrutura das pastas
+
+```text
+Instagram
+│
+├── Imagens
+│
+├── Videos
+│
+└── Publicados
+```
+
+---
+
+# 3. URL PÚBLICA DAS MÍDIAS
+
+O Instagram necessita de uma URL acessível para imagem ou vídeo.
+
+Não depender de links compartilhados do Google Drive.
+
+### Alternativas recomendadas
+
+* Supabase Storage
+* Cloudflare R2
+* AWS S3
+* Vercel Blob
+
+Caso seja mantido o Google Drive:
+
+O backend deverá gerar uma URL temporária acessível para a Meta.
+
+---
+
+# 4. PUBLICAÇÃO REAL NO INSTAGRAM
+
+## Situação Atual
+
+A função:
+
+```javascript
+publishToInstagramAPI()
+```
+
+é apenas simulada.
+
+---
+
+## Implementação Necessária
+
+### Criar Container
+
+```text
+POST /media
+```
+
+### Publicar
+
+```text
+POST /media_publish
+```
+
+Fluxo:
+
+```text
+Google Drive
+↓
+URL pública
+↓
+Container
+↓
+Processamento
+↓
+Publicação
+↓
+Instagram
+```
+
+---
+
+# 5. SEGURANÇA
+
+As credenciais não devem ser armazenadas no Front-End.
+
+Toda configuração deverá utilizar:
+
+```javascript
+process.env
+```
+
+---
+
+# 6. ADAPTAÇÃO PARA VERCEL
+
+Remover qualquer dependência de:
+
+```text
+db_storage.json
+```
+
+ou arquivos locais.
+
+Utilizar:
+
+* Supabase
+* APIs serverless
+
+---
+
+# CONFIGURAÇÕES QUE SERÃO FEITAS MANUALMENTE
+
+---
+
+# 1. SUPABASE
+
+Criar um projeto no Supabase.
+
+Obter:
+
+```env
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Observação:
+
+A SERVICE_ROLE_KEY deverá ser utilizada apenas no backend.
+
+---
+
+# 2. GOOGLE DRIVE
+
+Criar credenciais no Google Cloud.
+
+## Opção 1 - Service Account
+
+```env
+GOOGLE_CLIENT_EMAIL=
+GOOGLE_PRIVATE_KEY=
+GOOGLE_DRIVE_FOLDER_ID=
+```
+
+---
+
+## Opção 2 - OAuth
+
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+GOOGLE_DRIVE_FOLDER_ID=
+```
+
+---
+
+# 3. META DEVELOPER
+
+Criar uma aplicação do tipo:
+
+```text
+Business
+```
+
+Adicionar:
+
+```text
+Instagram Graph API
+```
+
+---
+
+## Permissões necessárias
+
+```text
+instagram_basic
+instagram_content_publish
+pages_show_list
+pages_read_engagement
+business_management
+```
+
+---
+
+## Variáveis
+
+```env
+META_APP_ID=
+META_APP_SECRET=
+INSTAGRAM_ACCESS_TOKEN=
+INSTAGRAM_BUSINESS_ID=
+FACEBOOK_PAGE_ID=
+GRAPH_API_VERSION=v23.0
+```
+
+---
+
+# IMPORTANTE
+
+O sistema NÃO utilizará usuário e senha do Instagram.
+
+Será utilizado:
+
+```text
+OAuth + Access Token
+```
+
+---
+
+# 4. GEMINI
+
+```env
+GEMINI_API_KEY=
+```
+
+---
+
+# 5. APLICAÇÃO
+
+```env
+APP_URL=
+APP_MODE=REAL
+NODE_ENV=production
+```
+
+---
+
+# VARIÁVEIS COMPLETAS DO VERCEL
+
+```env
+APP_URL=
+APP_MODE=REAL
+NODE_ENV=production
+
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+GOOGLE_CLIENT_EMAIL=
+GOOGLE_PRIVATE_KEY=
+GOOGLE_DRIVE_FOLDER_ID=
+
+META_APP_ID=
+META_APP_SECRET=
+INSTAGRAM_ACCESS_TOKEN=
+INSTAGRAM_BUSINESS_ID=
+FACEBOOK_PAGE_ID=
+GRAPH_API_VERSION=v23.0
+
+GEMINI_API_KEY=
+```
+
+---
+
+# ORDEM RECOMENDADA DE IMPLEMENTAÇÃO
+
+## Fase 1
+
+### Banco
+
+* Supabase
+
+### Upload
+
+* Google Drive
+
+### Histórico
+
+* Persistência real
+
+---
+
+## Fase 2
+
+### Publicação no Instagram
+
+* Graph API
+* Criação do Container
+* Publicação
+
+---
+
+## Fase 3
+
+### Agendamento
+
+* Scheduler
+* Cron
+* n8n
+
+---
+
+## Fase 4
+
+### IA
+
+* Geração de legendas
+* Sugestão de hashtags
+
+---
+
+## Fase 5
+
+### Aprovação via WhatsApp
+
+Integração futura com:
+
+* Meta Cloud API
+
+---
+
+# PRIORIDADE IMEDIATA
+
+1. Supabase.
+2. Google Drive.
+3. URL pública das mídias.
+4. Integração real com Instagram.
+5. Deploy definitivo no Vercel.
