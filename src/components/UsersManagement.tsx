@@ -24,6 +24,9 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<PerfilPublicacao>('CRIADOR');
   const [creating, setCreating] = useState(false);
+  const [passwordModalUser, setPasswordModalUser] = useState<EditableUser | null>(null);
+  const [passwordDraft, setPasswordDraft] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
 
   const loadUsers = async () => {
     setLoading(true);
@@ -86,17 +89,7 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
     }
   };
 
-  const resetPassword = async (user: EditableUser) => {
-    const password = window.prompt(`Informe a nova senha para ${user.nome}:`);
-    if (password === null) {
-      return;
-    }
-
-    if (password.trim().length < 6) {
-      alert('A nova senha deve ter ao menos 6 caracteres.');
-      return;
-    }
-
+  const resetPassword = async (user: EditableUser, password: string) => {
     updateLocalUser(user.id, { saving: true });
     try {
       const res = await apiFetch(`/api/users/${user.id}/reset-password`, {
@@ -107,11 +100,27 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao redefinir a senha.');
       updateLocalUser(user.id, { saving: false });
+      setPasswordModalUser(null);
+      setPasswordDraft('');
+      setPasswordConfirmation('');
       alert('Senha redefinida com sucesso.');
     } catch (err) {
       updateLocalUser(user.id, { saving: false });
       alert(err instanceof Error ? err.message : 'Falha ao redefinir a senha.');
     }
+  };
+
+  const submitPasswordReset = async () => {
+    if (!passwordModalUser) return;
+    if (passwordDraft.trim().length < 6) {
+      alert('A nova senha deve ter ao menos 6 caracteres.');
+      return;
+    }
+    if (passwordDraft !== passwordConfirmation) {
+      alert('A confirmação da senha não confere.');
+      return;
+    }
+    await resetPassword(passwordModalUser, passwordDraft);
   };
 
   const createUser = async () => {
@@ -231,7 +240,11 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
                     <button
                       type="button"
                       disabled={user.saving}
-                      onClick={() => void resetPassword(user)}
+                      onClick={() => {
+                        setPasswordModalUser(user);
+                        setPasswordDraft('');
+                        setPasswordConfirmation('');
+                      }}
                       className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Senha
@@ -247,6 +260,81 @@ export default function UsersManagement({ onUsersChanged }: UsersManagementProps
           </div>
         )}
       </div>
+
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 p-4 flex items-center justify-center">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Redefinir Senha</h3>
+                <p className="mt-1 text-xs text-slate-500">{passwordModalUser.nome}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordModalUser(null);
+                  setPasswordDraft('');
+                  setPasswordConfirmation('');
+                }}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-5">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Nova senha
+                </label>
+                <input
+                  type="password"
+                  value={passwordDraft}
+                  onChange={(event) => setPasswordDraft(event.target.value)}
+                  placeholder="Digite a nova senha"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Confirmar senha
+                </label>
+                <input
+                  type="password"
+                  value={passwordConfirmation}
+                  onChange={(event) => setPasswordConfirmation(event.target.value)}
+                  placeholder="Repita a nova senha"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-brand-primary"
+                />
+              </div>
+
+              <p className="text-[11px] text-slate-500">A senha precisa ter ao menos 6 caracteres.</p>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordModalUser(null);
+                  setPasswordDraft('');
+                  setPasswordConfirmation('');
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitPasswordReset()}
+                className="rounded-lg bg-brand-secondary px-4 py-2 text-xs font-bold text-brand-darker hover:bg-brand-primary"
+              >
+                Salvar nova senha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
