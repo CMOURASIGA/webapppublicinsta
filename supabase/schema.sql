@@ -70,3 +70,33 @@ create index if not exists posts_status_idx on posts(status);
 create index if not exists posts_drive_file_id_idx on posts(drive_file_id);
 create index if not exists historico_posts_post_id_idx on historico_posts(post_id);
 create index if not exists logs_timestamp_idx on logs(timestamp desc);
+
+alter table posts
+  add column if not exists media_validation_status text,
+  add column if not exists media_validation_errors jsonb default '[]'::jsonb,
+  add column if not exists media_validation_warnings jsonb default '[]'::jsonb,
+  add column if not exists media_metadata jsonb default '{}'::jsonb,
+  add column if not exists video_original_drive_file_id text,
+  add column if not exists video_original_drive_url text,
+  add column if not exists video_editado_drive_file_id text,
+  add column if not exists video_editado_drive_url text,
+  add column if not exists trim_start_sec numeric,
+  add column if not exists trim_end_sec numeric,
+  add column if not exists video_original_duration_sec numeric,
+  add column if not exists video_final_duration_sec numeric,
+  add column if not exists thumbnail_drive_file_id text,
+  add column if not exists thumbnail_drive_url text,
+  add column if not exists thumbnail_time_sec numeric,
+  add column if not exists video_edit_metadata jsonb default '{}'::jsonb;
+
+alter table posts
+  drop constraint if exists posts_media_validation_status_check;
+
+alter table posts
+  add constraint posts_media_validation_status_check
+  check (
+    media_validation_status is null
+    or media_validation_status in ('VALID', 'VALID_WITH_WARNINGS', 'INVALID')
+  );
+
+create index if not exists idx_posts_media_validation_status on posts (media_validation_status);

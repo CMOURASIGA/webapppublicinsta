@@ -12,6 +12,36 @@ export interface Usuario {
 }
 
 export type PostStatus = 'RASCUNHO' | 'PENDENTE' | 'APROVADA' | 'REJEITADA' | 'AGENDADA' | 'PUBLICADA' | 'ERRO';
+export type MediaValidationStatus = 'VALID' | 'VALID_WITH_WARNINGS' | 'INVALID';
+
+export interface MediaValidationIssue {
+  code: string;
+  message: string;
+}
+
+export interface MediaMetadata {
+  filename?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  width?: number;
+  height?: number;
+  duration_seconds?: number;
+  aspect_ratio?: number;
+  orientation?: 'vertical' | 'horizontal' | 'square' | 'unknown';
+  has_audio?: boolean;
+  source?: 'browser' | 'backend' | 'external';
+}
+
+export interface VideoEditMetadata {
+  edited?: boolean;
+  tool?: string;
+  trim_start_sec?: number;
+  trim_end_sec?: number;
+  thumbnail_time_sec?: number;
+  created_in_browser?: boolean;
+  original_filename?: string;
+  final_filename?: string;
+}
 
 export interface Post {
   id: string; // UUID
@@ -30,6 +60,22 @@ export interface Post {
   hashtags?: string; // separated by spaces/commas
   criado_por_nome?: string;
   erro_detalhe?: string;
+  media_validation_status?: MediaValidationStatus | null;
+  media_validation_errors?: MediaValidationIssue[];
+  media_validation_warnings?: MediaValidationIssue[];
+  media_metadata?: MediaMetadata;
+  video_original_drive_file_id?: string | null;
+  video_original_drive_url?: string | null;
+  video_editado_drive_file_id?: string | null;
+  video_editado_drive_url?: string | null;
+  trim_start_sec?: number | null;
+  trim_end_sec?: number | null;
+  video_original_duration_sec?: number | null;
+  video_final_duration_sec?: number | null;
+  thumbnail_drive_file_id?: string | null;
+  thumbnail_drive_url?: string | null;
+  thumbnail_time_sec?: number | null;
+  video_edit_metadata?: VideoEditMetadata;
 }
 
 export interface HistoricoPost {

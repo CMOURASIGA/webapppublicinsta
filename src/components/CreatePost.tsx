@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Post, PostStatus, Usuario } from '../types';
+import { MediaValidationIssue, Post, PostStatus, Usuario, VideoEditMetadata } from '../types';
 import { apiFetch } from '../lib/api';
+import { MAX_INLINE_VIDEO_UPLOAD_BYTES } from '../lib/videoFormat';
+import { VideoValidationResult, validateVideoFile } from '../lib/videoValidator';
+import VideoValidationResultPanel from './VideoValidationResult';
+import VideoEditor, { VideoEditorOutput } from './VideoEditor';
 import {
   CheckCircle,
   FileText,
@@ -26,8 +30,6 @@ function getCurrentRole(user: Usuario): 'CRIADOR' | 'APROVADOR' | 'ADMIN' {
   return user.perfil_publicacao || (user.perfil === 'ADMINISTRADOR' ? 'ADMIN' : 'CRIADOR');
 }
 
-const MAX_INLINE_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024;
-
 export default function CreatePost({ onPostCreated, currentUser }: CreatePostProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -41,6 +43,12 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
   const [fileId, setFileId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const [videoValidation, setVideoValidation] = useState<VideoValidationResult | null>(null);
+  const [videoEditorOutput, setVideoEditorOutput] = useState<VideoEditorOutput | null>(null);
+  const [videoUploadBlocked, setVideoUploadBlocked] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [thumbnailFileId, setThumbnailFileId] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTagsCount, setAiTagsCount] = useState(5);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -77,6 +85,12 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
     setFileUrl('');
     setFileId('');
     setUploaded(false);
+    setSelectedVideoFile(null);
+    setVideoValidation(null);
+    setVideoEditorOutput(null);
+    setVideoUploadBlocked(false);
+    setThumbnailUrl('');
+    setThumbnailFileId('');
     setAiPrompt('');
   };
 
@@ -90,6 +104,21 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
     setFileId(post.drive_file_id || '');
     setFileName(post.drive_file_id || post.titulo || '');
     setUploaded(Boolean(post.drive_url || post.drive_file_id));
+    setSelectedVideoFile(null);
+    setVideoValidation(
+      post.media_validation_status
+        ? {
+            status: post.media_validation_status,
+            errors: post.media_validation_errors || [],
+            warnings: post.media_validation_warnings || [],
+            metadata: post.media_metadata || { filename: post.titulo, mime_type: post.tipo === 'VIDEO' ? 'video/mp4' : 'image/jpeg', source: 'backend' },
+          }
+        : null,
+    );
+    setVideoEditorOutput(null);
+    setVideoUploadBlocked(post.media_validation_status === 'INVALID');
+    setThumbnailUrl(post.thumbnail_drive_url || '');
+    setThumbnailFileId(post.thumbnail_drive_file_id || '');
     setSuccessMsg('');
   };
 
@@ -146,21 +175,72 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
       reader.readAsDataURL(file);
     });
 
-  const getVideoDuration = async (file: File) =>
-    await new Promise<number>((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.onloadedmetadata = () => {
-        resolve(Number.isFinite(video.duration) ? video.duration : 0);
-        URL.revokeObjectURL(url);
-      };
-      video.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Nao foi possivel validar o video selecionado.'));
-      };
-      video.src = url;
+  const uploadMediaFile = async (file: File) => {
+    const base64Data = await readFileAsDataUrl(file);
+    const res = await apiFetch('/api/google/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        type: file.type,
+        sizeBytes: file.size,
+        base64Data,
+      }),
     });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Falha ao enviar o arquivo para o backend.');
+    }
+
+    return data as { fileId: string; url: string };
+  };
+
+  const clearUploadedMediaState = () => {
+    setFileName('');
+    setFileUrl('');
+    setFileId('');
+    setUploaded(false);
+    setThumbnailUrl('');
+    setThumbnailFileId('');
+  };
+
+  const handlePreparedVideo = async (output: VideoEditorOutput) => {
+    setUploading(true);
+    try {
+      const finalValidation = await validateVideoFile(output.finalFile);
+      setVideoValidation(finalValidation);
+      if (finalValidation.status === 'INVALID') {
+        setVideoUploadBlocked(true);
+        throw new Error('O video final ainda nao esta pronto para aprovacao. Ajuste o corte ou substitua o arquivo.');
+      }
+      if (output.finalFile.size > MAX_INLINE_VIDEO_UPLOAD_BYTES) {
+        setVideoUploadBlocked(true);
+        throw new Error('O video final ainda esta acima do limite seguro de upload. Reduza a duracao ou compacte o arquivo.');
+      }
+
+      const uploadedVideo = await uploadMediaFile(output.finalFile);
+      let uploadedThumbnail: { fileId: string; url: string } | null = null;
+      if (output.thumbnailFile) {
+        uploadedThumbnail = await uploadMediaFile(output.thumbnailFile);
+      }
+
+      setFileName(output.finalFile.name);
+      setFileId(uploadedVideo.fileId);
+      setFileUrl(uploadedVideo.url);
+      setUploaded(true);
+      setThumbnailUrl(uploadedThumbnail?.url || '');
+      setThumbnailFileId(uploadedThumbnail?.fileId || '');
+      setVideoEditorOutput(output);
+      setVideoUploadBlocked(false);
+    } catch (err) {
+      console.error(err);
+      clearUploadedMediaState();
+      alert(err instanceof Error ? err.message : 'Nao foi possivel preparar o video.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleFileUpload = async (file: File) => {
     setTipo(file.type.startsWith('video/') ? 'VIDEO' : 'IMAGEM');
@@ -169,41 +249,30 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
 
     try {
       if (file.type.startsWith('video/')) {
-        if (file.size > MAX_INLINE_VIDEO_UPLOAD_BYTES) {
-          throw new Error('O upload atual do sistema suporta videos de ate 45 MB por usar envio inline. Comprima o arquivo antes de enviar.');
-        }
-        const durationSeconds = await getVideoDuration(file);
-        if (durationSeconds > 180) {
-          throw new Error('O video tem mais de 3 minutos e hoje o sistema publica videos como Reels no Instagram.');
-        }
+        clearUploadedMediaState();
+        setSelectedVideoFile(file);
+        setVideoEditorOutput(null);
+        const validation = await validateVideoFile(file);
+        setVideoValidation(validation);
+        setVideoUploadBlocked(validation.status === 'INVALID');
+        return;
       }
-      const base64Data = await readFileAsDataUrl(file);
-      const res = await apiFetch('/api/google/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          type: file.type,
-          sizeBytes: file.size,
-          base64Data,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Falha ao enviar o arquivo para o backend.');
-      }
-
+      setSelectedVideoFile(null);
+      setVideoValidation(null);
+      setVideoEditorOutput(null);
+      setVideoUploadBlocked(false);
+      const data = await uploadMediaFile(file);
       setFileId(data.fileId);
       setFileUrl(data.url);
       setUploaded(true);
     } catch (err) {
       console.error(err);
       alert('Não foi possível enviar a mídia. Verifique a configuração do backend e tente novamente.');
-      setFileName('');
-      setFileUrl('');
-      setFileId('');
-      setUploaded(false);
+      clearUploadedMediaState();
+      setSelectedVideoFile(null);
+      setVideoValidation(null);
+      setVideoEditorOutput(null);
+      setVideoUploadBlocked(false);
     } finally {
       setUploading(false);
     }
@@ -252,6 +321,21 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
       return;
     }
 
+    if (tipo === 'VIDEO') {
+      if (!videoValidation) {
+        alert('Valide o video antes de salvar ou enviar para aprovacao.');
+        return;
+      }
+      if (videoValidation.status === 'INVALID' || videoUploadBlocked) {
+        alert('O post nao pode seguir porque o video possui erro tecnico. Corrija o arquivo e tente novamente.');
+        return;
+      }
+      if (!videoEditorOutput || !fileUrl) {
+        alert('Prepare o video e gere a versao final antes de continuar.');
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -264,6 +348,22 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
         drive_file_id: fileId,
         hashtags,
         status: targetStatus,
+        media_validation_status: tipo === 'VIDEO' ? videoValidation?.status : null,
+        media_validation_errors: tipo === 'VIDEO' ? (videoValidation?.errors || []) as MediaValidationIssue[] : [],
+        media_validation_warnings: tipo === 'VIDEO' ? (videoValidation?.warnings || []) as MediaValidationIssue[] : [],
+        media_metadata: tipo === 'VIDEO' ? videoValidation?.metadata : undefined,
+        video_original_drive_file_id: null,
+        video_original_drive_url: null,
+        video_editado_drive_file_id: tipo === 'VIDEO' ? fileId : null,
+        video_editado_drive_url: tipo === 'VIDEO' ? fileUrl : null,
+        trim_start_sec: tipo === 'VIDEO' ? videoEditorOutput?.trimStartSec ?? 0 : null,
+        trim_end_sec: tipo === 'VIDEO' ? videoEditorOutput?.trimEndSec ?? null : null,
+        video_original_duration_sec: tipo === 'VIDEO' ? videoEditorOutput?.originalDurationSec ?? null : null,
+        video_final_duration_sec: tipo === 'VIDEO' ? videoEditorOutput?.finalDurationSec ?? null : null,
+        thumbnail_drive_file_id: tipo === 'VIDEO' ? thumbnailFileId || null : null,
+        thumbnail_drive_url: tipo === 'VIDEO' ? thumbnailUrl || null : null,
+        thumbnail_time_sec: tipo === 'VIDEO' ? videoEditorOutput?.thumbnailTimeSec ?? null : null,
+        video_edit_metadata: tipo === 'VIDEO' ? (videoEditorOutput?.editMetadata as VideoEditMetadata | undefined) : undefined,
       };
 
       const endpoint = editingPostId ? `/api/posts/${editingPostId}` : '/api/posts';
@@ -488,7 +588,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               <input
                 id="file-upload-input"
                 type="file"
-                accept="image/*,video/mp4,video/quicktime,video/webm"
+                accept="image/*,video/mp4,video/quicktime,video/x-m4v"
                 onChange={handleFileInputChange}
                 className="hidden"
               />
@@ -512,10 +612,11 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
                   <button
                     type="button"
                     onClick={() => {
-                      setFileName('');
-                      setFileUrl('');
-                      setFileId('');
-                      setUploaded(false);
+                      clearUploadedMediaState();
+                      setSelectedVideoFile(null);
+                      setVideoValidation(null);
+                      setVideoEditorOutput(null);
+                      setVideoUploadBlocked(false);
                     }}
                     className="mx-auto inline-flex items-center gap-1 text-xs font-medium text-rose-600 hover:underline"
                   >
@@ -534,6 +635,33 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               )}
             </div>
           </div>
+
+          {tipo === 'VIDEO' && (
+            <div className="space-y-4">
+              <VideoValidationResultPanel result={videoValidation} />
+              {selectedVideoFile && videoValidation && videoValidation.status !== 'INVALID' && !uploaded && (
+                <VideoEditor
+                  file={selectedVideoFile}
+                  validation={videoValidation}
+                  onPrepared={handlePreparedVideo}
+                  onCancel={() => {
+                    setSelectedVideoFile(null);
+                    setVideoValidation(null);
+                    setVideoEditorOutput(null);
+                    setVideoUploadBlocked(false);
+                    clearUploadedMediaState();
+                  }}
+                />
+              )}
+              {uploaded && videoEditorOutput && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800">
+                  <p className="font-bold">Video preparado para publicacao.</p>
+                  <p className="mt-1">Duracao final: {videoEditorOutput.finalDurationSec.toFixed(1)}s.</p>
+                  {thumbnailUrl && <p className="mt-1">Thumbnail gerada e enviada com a midia.</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -564,7 +692,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || (tipo === 'VIDEO' && videoUploadBlocked)}
               onClick={() => void persistPost('RASCUNHO')}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
@@ -574,7 +702,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
 
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || (tipo === 'VIDEO' && (videoUploadBlocked || !uploaded || !videoEditorOutput))}
               onClick={() => void persistPost('PENDENTE')}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-secondary px-4 py-2.5 text-xs font-bold text-brand-darker hover:bg-brand-primary"
             >

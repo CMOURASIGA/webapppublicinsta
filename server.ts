@@ -3,7 +3,7 @@ import express from "express";
 import dotenv from "dotenv";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
-import { HistoricoPost, LogMessage, PerfilPublicacao, Post, SettingsConfig, Usuario } from "./src/types";
+import { HistoricoPost, LogMessage, PerfilPublicacao, Post, PostStatus, SettingsConfig, Usuario } from "./src/types";
 
 dotenv.config({ path: path.join(process.cwd(), ".env.local") });
 dotenv.config();
@@ -1159,6 +1159,25 @@ function normalizePostTypeInput(rawType: unknown, filename?: string): Post["tipo
   return inferPostType(typeof rawType === "string" ? rawType : undefined, filename);
 }
 
+const MAX_INLINE_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024;
+const ACCEPTED_VIDEO_UPLOAD_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/x-m4v"]);
+
+function getPublishingMediaUrl(post: Post): string | undefined {
+  return post.video_editado_drive_url || post.drive_url;
+}
+
+function assertVideoPostCanAdvance(payload: {
+  tipo?: Post["tipo"];
+  status?: PostStatus;
+  media_validation_status?: Post["media_validation_status"];
+}) {
+  const isVideo = payload.tipo === "VIDEO" || payload.tipo === "REELS";
+  const isPending = payload.status === "PENDENTE";
+  if (isVideo && isPending && payload.media_validation_status === "INVALID") {
+    throw new HttpError(400, "VIDEO_INVALID");
+  }
+}
+
 function filenameToTitle(filename: string): string {
   return filename.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Post importado";
 }
@@ -1507,11 +1526,12 @@ async function createInstagramContainer(post: Post): Promise<string> {
   });
 
   if (post.tipo === "VIDEO" || post.tipo === "REELS") {
-    if (!post.drive_url) {
+    const mediaUrl = getPublishingMediaUrl(post);
+    if (!mediaUrl) {
       throw new Error("Vídeo sem URL pública para publicação.");
     }
     body.set("media_type", "REELS");
-    body.set("video_url", post.drive_url);
+    body.set("video_url", mediaUrl);
   } else {
     if (!post.drive_url) {
       throw new Error("Imagem sem URL pública para publicação.");
@@ -1691,7 +1711,7 @@ async function importGoogleDrivePosts(author: string): Promise<Post[]> {
     }
 
     const now = new Date().toISOString();
-    const created = await createPostRecord({
+    const payload: Omit<Post, "id"> = {
       titulo: filenameToTitle(file.name),
       legenda: "",
       tipo: inferPostType(file.mimeType, file.name),
@@ -1702,7 +1722,8 @@ async function importGoogleDrivePosts(author: string): Promise<Post[]> {
       criado_em: file.createdTime || now,
       atualizado_em: now,
       criado_por_nome: author,
-    });
+    };
+    const created = await createPostRecord(payload);
 
     await createHistoryRecord({
       post_id: created.id,
@@ -1901,7 +1922,7 @@ app.post("/api/posts", async (req, res) => {
     const actingUser = await getActingUserFromRequest(req);
     assertCanCreatePosts(actingUser);
     const now = new Date().toISOString();
-    const created = await createPostRecord({
+    const payload: Omit<Post, "id"> = {
       titulo: parseBody(req.body.titulo, "Sem Título"),
       legenda: parseBody(req.body.legenda, ""),
       tipo: normalizePostTypeInput(req.body.tipo, req.body.filename),
@@ -1912,7 +1933,25 @@ app.post("/api/posts", async (req, res) => {
       criado_em: now,
       atualizado_em: now,
       criado_por_nome: actingUser.nome,
-    });
+      media_validation_status: req.body.media_validation_status ?? null,
+      media_validation_errors: req.body.media_validation_errors ?? [],
+      media_validation_warnings: req.body.media_validation_warnings ?? [],
+      media_metadata: req.body.media_metadata ?? undefined,
+      video_original_drive_file_id: req.body.video_original_drive_file_id ?? null,
+      video_original_drive_url: req.body.video_original_drive_url ?? null,
+      video_editado_drive_file_id: req.body.video_editado_drive_file_id ?? null,
+      video_editado_drive_url: req.body.video_editado_drive_url ?? null,
+      trim_start_sec: req.body.trim_start_sec ?? null,
+      trim_end_sec: req.body.trim_end_sec ?? null,
+      video_original_duration_sec: req.body.video_original_duration_sec ?? null,
+      video_final_duration_sec: req.body.video_final_duration_sec ?? null,
+      thumbnail_drive_file_id: req.body.thumbnail_drive_file_id ?? null,
+      thumbnail_drive_url: req.body.thumbnail_drive_url ?? null,
+      thumbnail_time_sec: req.body.thumbnail_time_sec ?? null,
+      video_edit_metadata: req.body.video_edit_metadata ?? undefined,
+    };
+    assertVideoPostCanAdvance(payload);
+    const created = await createPostRecord(payload);
 
     await createHistoryRecord({
       post_id: created.id,
@@ -1950,7 +1989,7 @@ app.put("/api/posts/:id", async (req, res) => {
 
     const actingUser = await getActingUserFromRequest(req);
     assertCanCreatePosts(actingUser);
-    const next = await updatePostRecord(req.params.id, {
+    const patch: Partial<Post> = {
       titulo: req.body.titulo ?? existing.titulo,
       legenda: req.body.legenda ?? existing.legenda,
       hashtags: req.body.hashtags ?? existing.hashtags,
@@ -1961,7 +2000,29 @@ app.put("/api/posts/:id", async (req, res) => {
       status: req.body.status ?? existing.status,
       atualizado_em: new Date().toISOString(),
       erro_detalhe: req.body.erro_detalhe ?? existing.erro_detalhe,
+      media_validation_status: req.body.media_validation_status ?? existing.media_validation_status,
+      media_validation_errors: req.body.media_validation_errors ?? existing.media_validation_errors,
+      media_validation_warnings: req.body.media_validation_warnings ?? existing.media_validation_warnings,
+      media_metadata: req.body.media_metadata ?? existing.media_metadata,
+      video_original_drive_file_id: req.body.video_original_drive_file_id ?? existing.video_original_drive_file_id,
+      video_original_drive_url: req.body.video_original_drive_url ?? existing.video_original_drive_url,
+      video_editado_drive_file_id: req.body.video_editado_drive_file_id ?? existing.video_editado_drive_file_id,
+      video_editado_drive_url: req.body.video_editado_drive_url ?? existing.video_editado_drive_url,
+      trim_start_sec: req.body.trim_start_sec ?? existing.trim_start_sec,
+      trim_end_sec: req.body.trim_end_sec ?? existing.trim_end_sec,
+      video_original_duration_sec: req.body.video_original_duration_sec ?? existing.video_original_duration_sec,
+      video_final_duration_sec: req.body.video_final_duration_sec ?? existing.video_final_duration_sec,
+      thumbnail_drive_file_id: req.body.thumbnail_drive_file_id ?? existing.thumbnail_drive_file_id,
+      thumbnail_drive_url: req.body.thumbnail_drive_url ?? existing.thumbnail_drive_url,
+      thumbnail_time_sec: req.body.thumbnail_time_sec ?? existing.thumbnail_time_sec,
+      video_edit_metadata: req.body.video_edit_metadata ?? existing.video_edit_metadata,
+    };
+    assertVideoPostCanAdvance({
+      tipo: patch.tipo,
+      status: patch.status,
+      media_validation_status: patch.media_validation_status,
     });
+    const next = await updatePostRecord(req.params.id, patch);
 
     await createHistoryRecord({
       post_id: next.id,
@@ -2016,6 +2077,12 @@ app.post("/api/posts/:id/submit", async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: "Post não encontrado." });
     }
+
+    assertVideoPostCanAdvance({
+      tipo: post.tipo,
+      status: "PENDENTE",
+      media_validation_status: post.media_validation_status,
+    });
 
     const next = await updatePostRecord(req.params.id, {
       status: "PENDENTE",
@@ -2256,9 +2323,17 @@ async function handleDriveUpload(req: express.Request, res: express.Response) {
     const filename = trimEnv(req.body.filename) || `upload-${Date.now()}`;
     const dataUrl = trimEnv(req.body.base64Data);
     const explicitMimeType = trimEnv(req.body.type) || "application/octet-stream";
+    const inferredType = inferPostType(explicitMimeType, filename);
 
     if (!dataUrl) {
       return res.status(400).json({ error: "base64Data é obrigatório." });
+    }
+    if (inferredType === "VIDEO" && !ACCEPTED_VIDEO_UPLOAD_MIME_TYPES.has(explicitMimeType)) {
+      return res.status(400).json({ error: "Formato de video nao suportado para este fluxo. Use MP4, MOV ou M4V." });
+    }
+    const declaredSizeBytes = typeof req.body.sizeBytes === "number" ? req.body.sizeBytes : Number(req.body.sizeBytes);
+    if (inferredType === "VIDEO" && Number.isFinite(declaredSizeBytes) && declaredSizeBytes > MAX_INLINE_VIDEO_UPLOAD_BYTES) {
+      return res.status(400).json({ error: "O video ultrapassa o limite seguro de 45 MB para o upload atual." });
     }
 
     const parsed = dataUrlToBuffer(dataUrl);
