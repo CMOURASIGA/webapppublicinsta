@@ -111,9 +111,9 @@ function validateMedia(post:Post, metadata:{ kind:'image'|'video'; width:number;
   if (kind === 'video') {
     if (durationSeconds <= 0) blockingIssues.push('Nao foi possivel validar a duracao do video.');
     if (durationSeconds > 180) blockingIssues.push('O video ultrapassa 3 minutos, limite adotado hoje para publicacao em Reels.');
-    if (ratio < 0.56 || ratio > 1.91) blockingIssues.push('Videos devem ficar entre 9:16 e 1.91:1.');
+    if (ratio < 0.54 || ratio > 1.91) blockingIssues.push('O video esta fora da proporcao minima aceita para publicacao.');
     if (Math.abs(ratio - 9 / 16) > 0.03) warnings.push('Como o publish atual usa Reels para videos, o formato ideal e 1080 x 1920 (9:16).');
-    if (width < 1080) warnings.push('A largura do video esta abaixo de 1080 px.');
+    if (width < 1080) warnings.push('A largura do video esta abaixo de 1080 px. A publicacao pode seguir, mas a qualidade pode ficar inferior.');
   } else if (post.tipo === 'REELS') {
     if (ratio < 0.56 || ratio > 0.8) blockingIssues.push('Reels devem usar formato vertical entre 9:16 e 4:5.');
     if (Math.abs(ratio - 9 / 16) > 0.03) warnings.push('O formato ideal para reel e 1080 x 1920 (9:16).');

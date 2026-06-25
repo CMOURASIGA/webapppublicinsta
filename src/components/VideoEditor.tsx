@@ -180,7 +180,7 @@ export default function VideoEditor({ file, validation, onPrepared, onCancel }: 
         </button>
         <button type="button" onClick={() => void handleGenerate()} disabled={processing || trimEndSec <= trimStartSec} className="inline-flex items-center gap-2 rounded-lg bg-brand-secondary px-4 py-2 text-xs font-bold text-brand-darker disabled:opacity-50">
           {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
-          Gerar video final
+          Aplicar corte e gerar capa
         </button>
       </div>
     </div>
