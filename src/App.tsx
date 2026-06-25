@@ -44,6 +44,7 @@ export default function App() {
   const canCreate = currentRole === 'CRIADOR' || currentRole === 'ADMIN';
   const canApprove = currentRole === 'APROVADOR' || currentRole === 'ADMIN';
   const canManageUsers = currentRole === 'ADMIN';
+  const mobileNavColumns = 4 + Number(canCreate) + Number(canApprove) + Number(canManageUsers);
 
   const loadCurrentUser = async () => {
     const res = await apiFetch('/api/auth/me');
@@ -453,7 +454,7 @@ export default function App() {
         </main>
 
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/80 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-safe">
-          <div className={`grid min-h-16 ${canManageUsers ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <div className="grid min-h-16" style={{ gridTemplateColumns: `repeat(${mobileNavColumns}, minmax(0, 1fr))` }}>
           <button
             onClick={() => setCurrentScreen('dashboard')}
             className={`flex flex-col items-center justify-center py-1 text-[10px] font-bold focus:outline-none transition-colors ${
