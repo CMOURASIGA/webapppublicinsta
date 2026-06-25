@@ -26,6 +26,8 @@ function getCurrentRole(user: Usuario): 'CRIADOR' | 'APROVADOR' | 'ADMIN' {
   return user.perfil_publicacao || (user.perfil === 'ADMINISTRADOR' ? 'ADMIN' : 'CRIADOR');
 }
 
+const MAX_INLINE_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024;
+
 export default function CreatePost({ onPostCreated, currentUser }: CreatePostProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -144,12 +146,37 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
       reader.readAsDataURL(file);
     });
 
+  const getVideoDuration = async (file: File) =>
+    await new Promise<number>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        resolve(Number.isFinite(video.duration) ? video.duration : 0);
+        URL.revokeObjectURL(url);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Nao foi possivel validar o video selecionado.'));
+      };
+      video.src = url;
+    });
+
   const handleFileUpload = async (file: File) => {
     setTipo(file.type.startsWith('video/') ? 'VIDEO' : 'IMAGEM');
     setUploading(true);
     setFileName(file.name);
 
     try {
+      if (file.type.startsWith('video/')) {
+        if (file.size > MAX_INLINE_VIDEO_UPLOAD_BYTES) {
+          throw new Error('O upload atual do sistema suporta videos de ate 45 MB por usar envio inline. Comprima o arquivo antes de enviar.');
+        }
+        const durationSeconds = await getVideoDuration(file);
+        if (durationSeconds > 180) {
+          throw new Error('O video tem mais de 3 minutos e hoje o sistema publica videos como Reels no Instagram.');
+        }
+      }
       const base64Data = await readFileAsDataUrl(file);
       const res = await apiFetch('/api/google/upload', {
         method: 'POST',
@@ -232,6 +259,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
         titulo,
         legenda,
         tipo,
+        filename: fileName,
         drive_url: fileUrl,
         drive_file_id: fileId,
         hashtags,
@@ -460,7 +488,7 @@ export default function CreatePost({ onPostCreated, currentUser }: CreatePostPro
               <input
                 id="file-upload-input"
                 type="file"
-                accept="image/*,video/mp4"
+                accept="image/*,video/mp4,video/quicktime,video/webm"
                 onChange={handleFileInputChange}
                 className="hidden"
               />

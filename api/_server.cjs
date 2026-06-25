@@ -341,21 +341,41 @@ function assertPostMediaValidation(payload, post) {
   const height = typeof candidate.height === "number" ? candidate.height : Number(candidate.height);
   const aspectRatio = typeof candidate.aspectRatio === "number" ? candidate.aspectRatio : Number(candidate.aspectRatio);
   const isFeedCompatible = candidate.isFeedCompatible === true;
+  const durationSeconds = candidate.durationSeconds === void 0 || candidate.durationSeconds === null ? void 0 : typeof candidate.durationSeconds === "number" ? candidate.durationSeconds : Number(candidate.durationSeconds);
+  const resolvedTipo = candidate.mediaKind === "video" ? "VIDEO" : candidate.mediaKind === "image" ? "IMAGEM" : post.tipo;
   if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 || !Number.isFinite(aspectRatio)) {
     throw new HttpError(400, "A valida\xE7\xE3o da m\xEDdia retornou dimens\xF5es inv\xE1lidas.");
   }
   if (!isFeedCompatible) {
     throw new HttpError(400, "A m\xEDdia n\xE3o passou na valida\xE7\xE3o para o feed do Instagram.");
   }
-  if (post.tipo === "REELS") {
+  if (resolvedTipo === "VIDEO" || resolvedTipo === "REELS") {
+    if (!Number.isFinite(durationSeconds) || Number(durationSeconds) <= 0) {
+      throw new HttpError(400, "N\xC3\xA3o foi poss\xC3\xADvel validar a dura\xC3\xA7\xC3\xA3o do v\xC3\xADdeo.");
+    }
+    if (Number(durationSeconds) > 180) {
+      throw new HttpError(
+        400,
+        "O v\xC3\xADdeo excede o limite atual de 3 minutos adotado para publica\xC3\xA7\xC3\xA3o em Reels no Instagram."
+      );
+    }
+  }
+  if (resolvedTipo === "REELS") {
     if (aspectRatio < 0.56 || aspectRatio > 0.8) {
       throw new HttpError(400, "Reels devem estar entre 9:16 e 4:5 para publica\xE7\xE3o consistente.");
     }
-    return;
+    return { resolvedTipo, width, height, aspectRatio, durationSeconds };
+  }
+  if (resolvedTipo === "VIDEO") {
+    if (aspectRatio < 0.56 || aspectRatio > 1.91) {
+      throw new HttpError(400, "V\xEDdeos devem usar propor\xE7\xE3o entre 9:16 e 1.91:1.");
+    }
+    return { resolvedTipo, width, height, aspectRatio, durationSeconds };
   }
   if (aspectRatio < 0.8 || aspectRatio > 1.91) {
     throw new HttpError(400, "Posts de feed devem usar propor\xE7\xE3o entre 4:5 e 1.91:1.");
   }
+  return { resolvedTipo, width, height, aspectRatio, durationSeconds };
 }
 function escapeHtml(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -873,10 +893,16 @@ ${hashtags}` : base;
 function inferPostType(mimeType, filename) {
   const normalizedMime = (mimeType || "").toLowerCase();
   const normalizedName = (filename || "").toLowerCase();
-  if (normalizedMime.startsWith("video/") || normalizedName.endsWith(".mp4") || normalizedName.endsWith(".mov") || normalizedName.endsWith(".webm")) {
+  if (normalizedMime.startsWith("video/") || normalizedMime === "video" || normalizedMime === "reels" || normalizedName.endsWith(".mp4") || normalizedName.endsWith(".mov") || normalizedName.endsWith(".webm")) {
     return "VIDEO";
   }
   return "IMAGEM";
+}
+function normalizePostTypeInput(rawType, filename) {
+  if (rawType === "IMAGEM" || rawType === "VIDEO" || rawType === "REELS") {
+    return rawType;
+  }
+  return inferPostType(typeof rawType === "string" ? rawType : void 0, filename);
 }
 function filenameToTitle(filename) {
   return filename.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Post importado";
@@ -1497,7 +1523,7 @@ app.post("/api/posts", async (req, res) => {
     const created = await createPostRecord({
       titulo: parseBody(req.body.titulo, "Sem T\xEDtulo"),
       legenda: parseBody(req.body.legenda, ""),
-      tipo: inferPostType(req.body.tipo, req.body.filename),
+      tipo: normalizePostTypeInput(req.body.tipo, req.body.filename),
       drive_file_id: req.body.drive_file_id || void 0,
       drive_url: req.body.drive_url || void 0,
       status: parseBody(req.body.status, "RASCUNHO"),
@@ -1538,6 +1564,7 @@ app.put("/api/posts/:id", async (req, res) => {
       titulo: req.body.titulo ?? existing.titulo,
       legenda: req.body.legenda ?? existing.legenda,
       hashtags: req.body.hashtags ?? existing.hashtags,
+      tipo: req.body.tipo ? normalizePostTypeInput(req.body.tipo, req.body.filename || existing.titulo) : existing.tipo,
       drive_url: req.body.drive_url ?? existing.drive_url,
       drive_file_id: req.body.drive_file_id ?? existing.drive_file_id,
       data_agendamento: req.body.data_agendamento ?? existing.data_agendamento,
@@ -1649,7 +1676,11 @@ app.post("/api/posts/:id/approve", async (req, res) => {
       return res.status(404).json({ error: "Post n\xE3o encontrado." });
     }
     const action = req.body.action === "schedule" ? "schedule" : "instant";
-    assertPostMediaValidation(req.body.mediaValidation, post);
+    const mediaValidation = assertPostMediaValidation(req.body.mediaValidation, post);
+    const effectivePost = mediaValidation.resolvedTipo !== post.tipo ? await updatePostRecord(req.params.id, {
+      tipo: mediaValidation.resolvedTipo,
+      atualizado_em: (/* @__PURE__ */ new Date()).toISOString()
+    }) : post;
     if (action === "schedule") {
       const appointmentTime = req.body.appointmentTime;
       if (!appointmentTime) {
@@ -1683,7 +1714,7 @@ app.post("/api/posts/:id/approve", async (req, res) => {
       observacao: "Aprova\xE7\xE3o concedida para publica\xE7\xE3o imediata.",
       criado_em: (/* @__PURE__ */ new Date()).toISOString()
     });
-    const published = await publishPost(post, actingUser.nome);
+    const published = await publishPost(effectivePost, actingUser.nome);
     res.json({ success: true, post: published });
   } catch (error) {
     if (req.params.id) {
@@ -1708,7 +1739,11 @@ app.post("/api/posts/aprovar", async (req, res) => {
       return res.status(404).json({ error: "Post n\xE3o encontrado." });
     }
     const action = req.body.action === "schedule" ? "schedule" : "instant";
-    assertPostMediaValidation(req.body.mediaValidation, post);
+    const mediaValidation = assertPostMediaValidation(req.body.mediaValidation, post);
+    const effectivePost = mediaValidation.resolvedTipo !== post.tipo ? await updatePostRecord(post.id, {
+      tipo: mediaValidation.resolvedTipo,
+      atualizado_em: (/* @__PURE__ */ new Date()).toISOString()
+    }) : post;
     if (action === "schedule") {
       const appointmentTime = req.body.appointmentTime;
       if (!appointmentTime) {
@@ -1730,7 +1765,7 @@ app.post("/api/posts/aprovar", async (req, res) => {
       });
       return res.json({ success: true, post: next });
     }
-    const published = await publishPost(post, actingUser.nome);
+    const published = await publishPost(effectivePost, actingUser.nome);
     return res.json({ success: true, post: published });
   } catch (error) {
     respondWithError(res, error, "Instagram API", "Falha ao aprovar/publicar post.");
@@ -1839,7 +1874,7 @@ app.post("/api/posts/:id/media", async (req, res) => {
     const next = await updatePostRecord(req.params.id, {
       drive_url: req.body.drive_url || existing.drive_url,
       drive_file_id: req.body.drive_file_id || existing.drive_file_id,
-      tipo: inferPostType(req.body.tipo, req.body.filename || existing.titulo),
+      tipo: normalizePostTypeInput(req.body.tipo, req.body.filename || existing.titulo),
       atualizado_em: (/* @__PURE__ */ new Date()).toISOString(),
       erro_detalhe: void 0
     });
