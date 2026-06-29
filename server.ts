@@ -17,6 +17,7 @@ type RuntimeMode = "SIMULATOR" | "REAL";
 
 interface RuntimeConfig {
   appUrl: string;
+  appUrlIsPublic: boolean;
   mode: RuntimeMode;
   operationalMode: RuntimeMode;
   graphApiVersion: string;
@@ -162,8 +163,18 @@ function normalizeAppUrl(rawUrl: string): string {
   }
 }
 
+function isLocalhostUrl(rawUrl: string): boolean {
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
+  } catch {
+    return true;
+  }
+}
+
 function getRuntimeConfig(): RuntimeConfig {
   const mode = trimEnv(process.env.APP_MODE).toUpperCase() === "REAL" ? "REAL" : "SIMULATOR";
+  const rawAppUrl = trimEnv(process.env.APP_URL);
   const supabaseUrl = trimEnv(process.env.SUPABASE_URL);
   const supabaseAnonKey = trimEnv(process.env.SUPABASE_ANON_KEY);
   const supabaseServiceRoleKey = trimEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -185,7 +196,8 @@ function getRuntimeConfig(): RuntimeConfig {
   const metaRedirectUri = trimEnv(process.env.META_REDIRECT_URI);
   const metaVerifyToken = trimEnv(process.env.META_VERIFY_TOKEN);
   const n8nApprovalWebhookUrl = trimEnv(process.env.N8N_APPROVAL_WEBHOOK_URL);
-  const appUrl = normalizeAppUrl(trimEnv(process.env.APP_URL));
+  const appUrl = normalizeAppUrl(rawAppUrl);
+  const appUrlIsPublic = Boolean(rawAppUrl) && !isLocalhostUrl(appUrl);
   const geminiModel = trimEnv(process.env.GEMINI_MODEL) || "gemini-3.5-flash";
   const mediaUrlSigningSecret = trimEnv(process.env.MEDIA_URL_SIGNING_SECRET) || "local-media-secret";
 
@@ -208,12 +220,17 @@ function getRuntimeConfig(): RuntimeConfig {
   }
   if (!instagramAccessToken) missingEnv.push("INSTAGRAM_ACCESS_TOKEN");
   if (!instagramUserId && !instagramBusinessId) missingEnv.push("INSTAGRAM_USER_ID ou INSTAGRAM_BUSINESS_ID");
+  if (!rawAppUrl) missingEnv.push("APP_URL");
+  if (rawAppUrl && !appUrlIsPublic) missingEnv.push("APP_URL deve apontar para uma URL pública acessível pela Meta");
 
   const operationalMode: RuntimeMode =
-    mode === "REAL" && supabaseConfigured && googleConfigured && instagramConfigured ? "REAL" : "SIMULATOR";
+    mode === "REAL" && supabaseConfigured && googleConfigured && instagramConfigured && appUrlIsPublic
+      ? "REAL"
+      : "SIMULATOR";
 
   return {
     appUrl,
+    appUrlIsPublic,
     mode,
     operationalMode,
     graphApiVersion,
@@ -1161,9 +1178,25 @@ function normalizePostTypeInput(rawType: unknown, filename?: string): Post["tipo
 
 const MAX_INLINE_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024;
 const ACCEPTED_VIDEO_UPLOAD_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/x-m4v"]);
+const INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS = Number(process.env.INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS || 240000);
+const INSTAGRAM_CONTAINER_WAIT_POLL_MS = Number(process.env.INSTAGRAM_CONTAINER_WAIT_POLL_MS || 4000);
 
 function getPublishingMediaUrl(post: Post): string | undefined {
   return post.video_editado_drive_url || post.drive_url;
+}
+
+function assertPublicMediaUrl(mediaUrl: string | undefined, mediaKind: "imagem" | "vídeo"): string {
+  if (!mediaUrl) {
+    throw new Error(`${mediaKind === "vídeo" ? "Vídeo" : "Imagem"} sem URL pública para publicação.`);
+  }
+
+  if (isLocalhostUrl(mediaUrl)) {
+    throw new Error(
+      `APP_URL precisa apontar para uma URL pública. A URL atual da mídia (${mediaUrl}) não pode ser acessada pela Meta.`,
+    );
+  }
+
+  return mediaUrl;
 }
 
 function assertVideoPostCanAdvance(payload: {
@@ -1526,17 +1559,11 @@ async function createInstagramContainer(post: Post): Promise<string> {
   });
 
   if (post.tipo === "VIDEO" || post.tipo === "REELS") {
-    const mediaUrl = getPublishingMediaUrl(post);
-    if (!mediaUrl) {
-      throw new Error("Vídeo sem URL pública para publicação.");
-    }
+    const mediaUrl = assertPublicMediaUrl(getPublishingMediaUrl(post), "vídeo");
     body.set("media_type", "REELS");
     body.set("video_url", mediaUrl);
   } else {
-    if (!post.drive_url) {
-      throw new Error("Imagem sem URL pública para publicação.");
-    }
-    body.set("image_url", post.drive_url);
+    body.set("image_url", assertPublicMediaUrl(post.drive_url, "imagem"));
   }
 
   const result = await instagramGraphRequest<{ id: string }>(`/${publishingActorId}/media`, {
@@ -1552,24 +1579,33 @@ async function createInstagramContainer(post: Post): Promise<string> {
 
 async function waitForContainerReady(containerId: string): Promise<void> {
   const config = getRuntimeConfig();
+  const startedAt = Date.now();
+  let lastStatusCode: string | undefined;
 
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; Date.now() - startedAt < INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS; attempt += 1) {
     const status = await instagramGraphRequest<{ status_code?: string; status?: string }>(
       `/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(config.instagramAccessToken)}`,
     );
 
     const code = status.status_code || status.status;
-    if (!code || code === "FINISHED" || code === "PUBLISHED") {
+    lastStatusCode = code;
+    if (code === "FINISHED" || code === "PUBLISHED") {
       return;
     }
     if (code === "ERROR" || code === "EXPIRED") {
       throw new Error(`Container do Instagram retornou status ${code}.`);
     }
 
-    await sleep(2000);
+    const remaining = INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS - (Date.now() - startedAt);
+    if (remaining <= 0) {
+      break;
+    }
+    await sleep(Math.min(INSTAGRAM_CONTAINER_WAIT_POLL_MS, remaining));
   }
 
-  throw new Error("Tempo esgotado aguardando processamento da mídia no Instagram.");
+  throw new Error(
+    `Tempo esgotado aguardando processamento da mídia no Instagram. Último status: ${lastStatusCode || "desconhecido"}.`,
+  );
 }
 
 async function publishInstagramContainer(creationId: string): Promise<{ mediaId: string; permalink?: string }> {

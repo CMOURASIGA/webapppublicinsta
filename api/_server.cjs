@@ -104,8 +104,17 @@ function normalizeAppUrl(rawUrl) {
     return fallback;
   }
 }
+function isLocalhostUrl(rawUrl) {
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
+  } catch {
+    return true;
+  }
+}
 function getRuntimeConfig() {
   const mode = trimEnv(process.env.APP_MODE).toUpperCase() === "REAL" ? "REAL" : "SIMULATOR";
+  const rawAppUrl = trimEnv(process.env.APP_URL);
   const supabaseUrl = trimEnv(process.env.SUPABASE_URL);
   const supabaseAnonKey = trimEnv(process.env.SUPABASE_ANON_KEY);
   const supabaseServiceRoleKey = trimEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -127,7 +136,8 @@ function getRuntimeConfig() {
   const metaRedirectUri = trimEnv(process.env.META_REDIRECT_URI);
   const metaVerifyToken = trimEnv(process.env.META_VERIFY_TOKEN);
   const n8nApprovalWebhookUrl = trimEnv(process.env.N8N_APPROVAL_WEBHOOK_URL);
-  const appUrl = normalizeAppUrl(trimEnv(process.env.APP_URL));
+  const appUrl = normalizeAppUrl(rawAppUrl);
+  const appUrlIsPublic = Boolean(rawAppUrl) && !isLocalhostUrl(appUrl);
   const geminiModel = trimEnv(process.env.GEMINI_MODEL) || "gemini-3.5-flash";
   const mediaUrlSigningSecret = trimEnv(process.env.MEDIA_URL_SIGNING_SECRET) || "local-media-secret";
   const supabaseConfigured = Boolean(supabaseUrl && supabaseServiceRoleKey);
@@ -147,9 +157,12 @@ function getRuntimeConfig() {
   }
   if (!instagramAccessToken) missingEnv.push("INSTAGRAM_ACCESS_TOKEN");
   if (!instagramUserId && !instagramBusinessId) missingEnv.push("INSTAGRAM_USER_ID ou INSTAGRAM_BUSINESS_ID");
-  const operationalMode = mode === "REAL" && supabaseConfigured && googleConfigured && instagramConfigured ? "REAL" : "SIMULATOR";
+  if (!rawAppUrl) missingEnv.push("APP_URL");
+  if (rawAppUrl && !appUrlIsPublic) missingEnv.push("APP_URL deve apontar para uma URL p\xFAblica acess\xEDvel pela Meta");
+  const operationalMode = mode === "REAL" && supabaseConfigured && googleConfigured && instagramConfigured && appUrlIsPublic ? "REAL" : "SIMULATOR";
   return {
     appUrl,
+    appUrlIsPublic,
     mode,
     operationalMode,
     graphApiVersion,
@@ -906,8 +919,21 @@ function normalizePostTypeInput(rawType, filename) {
 }
 var MAX_INLINE_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024;
 var ACCEPTED_VIDEO_UPLOAD_MIME_TYPES = /* @__PURE__ */ new Set(["video/mp4", "video/quicktime", "video/x-m4v"]);
+var INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS = Number(process.env.INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS || 24e4);
+var INSTAGRAM_CONTAINER_WAIT_POLL_MS = Number(process.env.INSTAGRAM_CONTAINER_WAIT_POLL_MS || 4e3);
 function getPublishingMediaUrl(post) {
   return post.video_editado_drive_url || post.drive_url;
+}
+function assertPublicMediaUrl(mediaUrl, mediaKind) {
+  if (!mediaUrl) {
+    throw new Error(`${mediaKind === "v\xEDdeo" ? "V\xEDdeo" : "Imagem"} sem URL p\xFAblica para publica\xE7\xE3o.`);
+  }
+  if (isLocalhostUrl(mediaUrl)) {
+    throw new Error(
+      `APP_URL precisa apontar para uma URL p\xFAblica. A URL atual da m\xEDdia (${mediaUrl}) n\xE3o pode ser acessada pela Meta.`
+    );
+  }
+  return mediaUrl;
 }
 function assertVideoPostCanAdvance(payload) {
   const isVideo = payload.tipo === "VIDEO" || payload.tipo === "REELS";
@@ -1212,17 +1238,11 @@ async function createInstagramContainer(post) {
     caption: buildCaption(post)
   });
   if (post.tipo === "VIDEO" || post.tipo === "REELS") {
-    const mediaUrl = getPublishingMediaUrl(post);
-    if (!mediaUrl) {
-      throw new Error("V\xEDdeo sem URL p\xFAblica para publica\xE7\xE3o.");
-    }
+    const mediaUrl = assertPublicMediaUrl(getPublishingMediaUrl(post), "v\xEDdeo");
     body.set("media_type", "REELS");
     body.set("video_url", mediaUrl);
   } else {
-    if (!post.drive_url) {
-      throw new Error("Imagem sem URL p\xFAblica para publica\xE7\xE3o.");
-    }
-    body.set("image_url", post.drive_url);
+    body.set("image_url", assertPublicMediaUrl(post.drive_url, "imagem"));
   }
   const result = await instagramGraphRequest(`/${publishingActorId}/media`, {
     method: "POST",
@@ -1235,20 +1255,29 @@ async function createInstagramContainer(post) {
 }
 async function waitForContainerReady(containerId) {
   const config = getRuntimeConfig();
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  const startedAt = Date.now();
+  let lastStatusCode;
+  for (let attempt = 0; Date.now() - startedAt < INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS; attempt += 1) {
     const status = await instagramGraphRequest(
       `/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(config.instagramAccessToken)}`
     );
     const code = status.status_code || status.status;
-    if (!code || code === "FINISHED" || code === "PUBLISHED") {
+    lastStatusCode = code;
+    if (code === "FINISHED" || code === "PUBLISHED") {
       return;
     }
     if (code === "ERROR" || code === "EXPIRED") {
       throw new Error(`Container do Instagram retornou status ${code}.`);
     }
-    await sleep(2e3);
+    const remaining = INSTAGRAM_CONTAINER_WAIT_TIMEOUT_MS - (Date.now() - startedAt);
+    if (remaining <= 0) {
+      break;
+    }
+    await sleep(Math.min(INSTAGRAM_CONTAINER_WAIT_POLL_MS, remaining));
   }
-  throw new Error("Tempo esgotado aguardando processamento da m\xEDdia no Instagram.");
+  throw new Error(
+    `Tempo esgotado aguardando processamento da m\xEDdia no Instagram. \xDAltimo status: ${lastStatusCode || "desconhecido"}.`
+  );
 }
 async function publishInstagramContainer(creationId) {
   const config = getRuntimeConfig();
