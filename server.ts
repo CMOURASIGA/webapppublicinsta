@@ -1252,6 +1252,18 @@ function base64UrlEncode(value: Buffer | string): string {
     .replace(/=+$/g, "");
 }
 
+function formatGoogleTokenRefreshError(responseText: string): string {
+  if (responseText.includes("invalid_grant")) {
+    return "Token do Google expirado ou revogado. Refaça o OAuth em /api/google/oauth/start e atualize GOOGLE_REFRESH_TOKEN.";
+  }
+
+  if (responseText.includes("invalid_client")) {
+    return "Credenciais OAuth do Google inválidas. Verifique GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.";
+  }
+
+  return `Falha ao atualizar token do Google: ${responseText}`;
+}
+
 async function getGoogleAccessToken(): Promise<string> {
   const config = getRuntimeConfig();
 
@@ -1311,7 +1323,7 @@ async function getGoogleAccessToken(): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Falha ao atualizar token do Google: ${await response.text()}`);
+    throw new HttpError(401, formatGoogleTokenRefreshError(await response.text()));
   }
 
   const json = (await response.json()) as GoogleAccessTokenResponse;

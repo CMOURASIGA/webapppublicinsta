@@ -972,6 +972,15 @@ function dataUrlToBuffer(dataUrl) {
 function base64UrlEncode(value) {
   return Buffer.from(value).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
+function formatGoogleTokenRefreshError(responseText) {
+  if (responseText.includes("invalid_grant")) {
+    return "Token do Google expirado ou revogado. Refaça o OAuth em /api/google/oauth/start e atualize GOOGLE_REFRESH_TOKEN.";
+  }
+  if (responseText.includes("invalid_client")) {
+    return "Credenciais OAuth do Google inválidas. Verifique GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.";
+  }
+  return `Falha ao atualizar token do Google: ${responseText}`;
+}
 async function getGoogleAccessToken() {
   const config = getRuntimeConfig();
   if (!config.googleConfigured) {
@@ -1024,7 +1033,7 @@ async function getGoogleAccessToken() {
     })
   });
   if (!response.ok) {
-    throw new Error(`Falha ao atualizar token do Google: ${await response.text()}`);
+    throw new HttpError(401, formatGoogleTokenRefreshError(await response.text()));
   }
   const json = await response.json();
   return json.access_token;
